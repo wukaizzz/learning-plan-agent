@@ -1,0 +1,53 @@
+.message-input-container {
+  border-top: 1px solid #e5e7eb;
+  background-color: white;
+  padding: 1rem;
+}
+
+.message-input-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.message-input-textarea-container {
+  flex: 1;
+  position: relative;
+}
+
+.message-input-textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  resize: none;
+  font-family: inherit;
+  font-size: 1rem;
+  min-height: 48px;
+  max-height: 200px;
+}
+
+.message-input-textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.message-input-textarea:disabled {
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.message-input-textarea::placeholder {
+  color: #9ca3af;
+}
+
+.message-input-button {
+  flex-shrink: 0;
+}
+
+.message-input-hint {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
