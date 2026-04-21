@@ -6,6 +6,7 @@ import { useChat, useStream, useAgent } from '../../hooks';
 import type { Message } from '../../types/chat';
 import './ChatPanel.css';
 
+import { InputGroupDemo } from '../ui-shadcn/Search'
 interface ChatPanelProps {
 }
 
