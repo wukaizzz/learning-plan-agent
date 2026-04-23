@@ -1,14 +1,26 @@
+/* Container for sidebar + chat panel */
+.chat-panel-container {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Main Chat Panel */
 .chat-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
   background-color: white;
+  flex: 1;
+  min-width: 0;
 }
 
 .chat-panel-header {
   border-bottom: 1px solid #e5e7eb;
   background-color: white;
   padding: 1rem 1.5rem;
+  flex-shrink: 0;
 }
 
 .chat-panel-header-content {
@@ -48,6 +60,7 @@
 .chat-panel-messages {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .chat-panel-no-api {

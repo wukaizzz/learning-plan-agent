@@ -16,10 +16,20 @@ export interface ToolCall {
   error?: string;
 }
 
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface ChatStore {
   messages: Message[];
   currentAgentId: string | null;
   isStreaming: boolean;
+  currentSessionId: string | null;
+  sessions: ChatSession[];
 
   // Actions
   addMessage: (message: Message) => void;
@@ -31,4 +41,11 @@ export interface ChatStore {
   deleteMessage: (messageId: string) => void;
   addToolCall: (messageId: string, toolCall: ToolCall) => void;
   updateLastAssistantMessage: (content: string) => void;
+
+  // Session management
+  createNewSession: (title?: string) => string;
+  switchSession: (sessionId: string) => void;
+  deleteSession: (sessionId: string) => void;
+  updateSessionTitle: (sessionId: string, title: string) => void;
+  getAllSessions: () => ChatSession[];
 }
