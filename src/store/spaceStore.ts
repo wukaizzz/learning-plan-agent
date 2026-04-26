@@ -90,7 +90,7 @@ export const useSpaceStore = create<SpaceStore>()(
             if (state.spaces.length > 0) {
               state.currentSpaceId = state.spaces[0].id;
             } else {
-              state.currentSpaceId = null;
+              state.currentSpaceId = null;  
             }
           }
         });

@@ -60,3 +60,6 @@ coverage/
 
 # 其他缓存
 *.tsbuildinfo
+
+*.md
+*.txt
