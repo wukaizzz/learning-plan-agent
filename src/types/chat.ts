@@ -22,6 +22,7 @@ export interface ChatSession {
   messages: Message[];
   createdAt: number;
   updatedAt: number;
+  draftMessage: string; // Session的草稿内容
 }
 
 export interface ChatStore {
@@ -48,4 +49,9 @@ export interface ChatStore {
   deleteSession: (sessionId: string) => void;
   updateSessionTitle: (sessionId: string, title: string) => void;
   getAllSessions: () => ChatSession[];
+
+  //  Draft management
+  setSessionDraft: (sessionId: string, draft: string) => void;
+  getSessionDraft: (sessionId: string) => string;
+  clearSessionDraft: (sessionId: string) => void;
 }

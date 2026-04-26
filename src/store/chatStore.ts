@@ -147,7 +147,8 @@ export const useChatStore = create<ChatStore>()(
           title: title || '新对话',
           messages: [],
           createdAt: Date.now(),
-          updatedAt: Date.now()
+          updatedAt: Date.now(),
+          draftMessage: '' 
         };
 
         set((state) => {
@@ -197,6 +198,33 @@ export const useChatStore = create<ChatStore>()(
 
       getAllSessions: () => {
         return get().sessions;
+      },
+
+      //  Draft management
+      setSessionDraft: (sessionId: string, draft: string) => {
+        set((state) => {
+          const session = state.sessions.find(s => s.id === sessionId);
+          if (session) {
+            session.draftMessage = draft;
+            session.updatedAt = Date.now();
+          }
+        });
+      },
+
+      getSessionDraft: (sessionId: string) => {
+        const state = get();
+        const session = state.sessions.find(s => s.id === sessionId);
+        return session?.draftMessage || '';
+      },
+
+      clearSessionDraft: (sessionId: string) => {
+        set((state) => {
+          const session = state.sessions.find(s => s.id === sessionId);
+          if (session) {
+            session.draftMessage = '';
+            session.updatedAt = Date.now();
+          }
+        });
       }
     })),
     {
