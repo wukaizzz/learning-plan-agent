@@ -1,8 +1,8 @@
 # AI 学习规划 Agent Web App 项目概览
 
-> **最后更新**: 2026-04-23
-> **项目状态**: 核心架构重构中，从通用聊天转向学习规划专用
-> **产品定位**: 学生/自学者学习规划工作台
+> **最后更新**: 2026-04-27
+> **项目状态**: 基础架构完成，核心功能开发阶段
+> **产品定位**: 学生/自学者学习规划工作台 + 学习空间管理系统
 
 ## 📋 项目简介
 
@@ -60,10 +60,17 @@ src/
 │       └── riskAnalyzer.ts   # 风险分析
 │
 ├── components/                 # React组件
-│   ├── workspace/             # 学习空间
-│   │   ├── SpaceList.tsx     # 学习空间列表
-│   │   ├── SpaceCard.tsx     # 空间卡片
-│   │   └── SpaceCreator.tsx  # 创建空间
+│   ├── workspace/             # 学习空间 ✅
+│   │   ├── WorkSpacePanel.tsx# 学习空间管理面板 ✅
+│   │   ├── SpaceCard.tsx     # 空间卡片 ✅
+│   │   ├── CreateSpaceWizard.tsx # 分步创建向导 ✅
+│   │   ├── EditSpaceForm.tsx  # 编辑表单 ✅
+│   │   ├── SpaceActionsMenu.tsx # 操作菜单 ✅
+│   │   └── DeletedSpacesList.tsx # 已删除空间管理 ✅
+│   ├── common/                # 通用组件 ✅
+│   │   ├── SideDrawer.tsx    # 侧边抽屉 ✅
+│   │   ├── Modal.tsx         # 模态框 ✅
+│   │   └── Button.tsx        # 按钮 ✅
 │   ├── planning/              # 计划相关
 │   │   ├── PlanTimeline.tsx  # 计划时间轴
 │   │   ├── PlanVersion.tsx   # 版本对比
@@ -78,9 +85,9 @@ src/
 │   │   ├── RiskAlert.tsx     # 风险提示
 │   │   └── FocusTasks.tsx    # 重点任务
 │   ├── chat/                  # Agent对话
-│   │   ├── ChatPanel.tsx     # 聊天面板
-│   │   ├── MessageList.tsx   # 消息列表
-│   │   └── MessageInput.tsx  # 消息输入
+│   │   ├── ChatPanel.tsx     # 聊天面板 ✅
+│   │   ├── MessageList.tsx   # 消息列表 ✅
+│   │   └── MessageInput.tsx  # 消息输入 ✅
 │   └── ui-blocks/             # Generative UI组件
 │       ├── SummaryCard.tsx   # 概况卡片
 │       ├── StudyTimeline.tsx # 学习时间轴
@@ -89,17 +96,18 @@ src/
 │       └── ActionBar.tsx     # 操作栏
 │
 ├── store/                      # 状态管理
-│   ├── spaceStore.ts         # 学习空间状态
+│   ├── spaceStore.ts         # 学习空间状态 ✅
 │   ├── planStore.ts          # 计划版本状态
 │   ├── taskStore.ts          # 任务状态
-│   └── chatStore.ts          # 聊天状态
+│   └── chatStore.ts          # 聊天状态 ✅
 │
 ├── types/                      # 类型定义
-│   ├── space.ts              # 学习空间类型
+│   ├── space.ts              # 学习空间类型 ✅
 │   ├── plan.ts               # 计划类型
 │   ├── task.ts               # 任务类型
 │   ├── uiBlocks.ts           # UI Block类型
-│   └── agent.ts              # Agent类型
+│   ├── agent.ts              # Agent类型
+│   └── chat.ts               # 聊天类型 ✅
 │
 └── utils/                      # 工具函数
     ├── dateHelper.ts         # 日期处理
@@ -285,7 +293,7 @@ interface UIBlock {
 
 ## 🚀 项目推进计划
 
-### 🎯 第一阶段：核心框架搭建 (Week 1-2)
+### 🎯 第一阶段：核心框架搭建 (Week 1-2) ✅ 部分完成
 **目标**: 建立Schema-Driven Generative UI基础架构
 
 #### 1.1 Schema系统
@@ -294,17 +302,21 @@ interface UIBlock {
 - [ ] 实现Component Registry (componentRegistry.ts)
 - [ ] 创建基础UI Block组件
 
-#### 1.2 学习空间系统
-- [ ] 设计空间数据模型和Store
-- [ ] 实现空间列表和创建功能
-- [ ] 建立空间隔离和切换机制
-- [ ] 空间卡片和列表UI组件
+#### 1.2 学习空间系统 ✅
+- [x] 设计空间数据模型和Store
+- [x] 实现空间列表和创建功能
+- [x] 建立空间隔离和切换机制
+- [x] 空间卡片和列表UI组件
+- [x] 分步创建向导 (5步骤)
+- [x] 软删除机制 (30天恢复)
+- [x] 完整编辑功能
+- [x] 操作菜单系统
 
 #### 1.3 基础Agent对话
 - [ ] 重构StudyAgent核心逻辑
 - [ ] 实现学习目标采集对话流程
 - [ ] 建立对话上下文管理
-- [ ] 基础聊天界面（复用现有组件）
+- [x] 基础聊天界面（复用现有组件）
 
 ### 🎯 第二阶段：计划生成系统 (Week 3-4)
 **目标**: 实现智能学习计划生成和版本管理
@@ -424,24 +436,28 @@ pnpm run build
 pnpm run lint
 ```
 
-## 📊 项目完成度评估 (重新评估)
+## 📊 项目完成度评估 (最新更新)
 
 | 模块 | 完成度 | 说明 |
 |------|--------|------|
 | 通用聊天功能 | 95% | 基础聊天架构完整 |
-| 会话管理 | 90% | 通用会话系统完成 |
-| 学习空间系统 | 0% | 🔥 需要重新设计 |
+| 会话管理 | 95% | ✅ 多空间会话隔离 + 独立聊天记录 |
+| 学习空间系统 | 90% | ✅ 完整CRUD + 软删除 + 分步向导 + 聊天集成 |
+| 通用UI组件 | 60% | ✅ SideDrawer + Modal + Button等 |
+| 状态管理 | 85% | ✅ spaceStore完善 + chatStore空间隔离 |
 | Schema-Driven UI | 0% | 🔥 核心待实现 |
 | 计划生成引擎 | 0% | 🔥 核心待实现 |
 | 任务管理系统 | 0% | 🔥 核心待实现 |
 | 学习Dashboard | 0% | 🔥 核心待实现 |
-| **总体完成度** | **15%** | **🔥 需要架构重构** |
+| **总体完成度** | **50%** | **🟢 空间聊天隔离完成，AI功能开发准备就绪** |
 
-### 🔥 紧急任务
-1. **架构重构** - 从通用聊天转向学习规划专用
-2. **Schema系统** - 实现UI Block定义和组件注册
-3. **核心业务逻辑** - 学习规划和任务管理算法
-4. **数据模型** - 重新设计符合学习规划的数据结构
+### 🎯 当前优先任务
+1. **✅ 学习空间基础** - 已完成CRUD、软删除、分步创建向导
+2. **✅ ChatPanel集成** - ✅ 已完成空间隔离的聊天系统
+3. **✅ 会话管理升级** - ✅ 多空间会话隔离和独立聊天记录
+4. **🔥 Schema系统** - 实现UI Block定义和组件注册
+5. **🔥 核心业务逻辑** - 学习规划和任务管理算法
+6. **🔥 数据模型** - 扩展学习计划相关数据结构
 
 ## 🎓 项目核心亮点
 
@@ -490,8 +506,8 @@ pnpm run lint
 
 ---
 
-**项目维护者**: wukaizzz  
-**项目定位**: AI学习规划Agent Web App  
-**最后更新**: 2026-04-23  
-**当前阶段**: 🔥 架构重构和核心功能开发  
-**下一步**: 实现Schema-Driven Generative UI系统
+**项目维护者**: wukaizzz
+**项目定位**: AI学习规划Agent Web App
+**最后更新**: 2026-04-27
+**当前阶段**: 🟢 学习空间与聊天系统集成完成，AI功能开发准备就绪
+**下一步**: 实现Schema系统，开始AI学习规划核心功能开发

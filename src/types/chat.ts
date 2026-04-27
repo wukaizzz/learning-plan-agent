@@ -18,11 +18,12 @@ export interface ToolCall {
 
 export interface ChatSession {
   id: string;
+  spaceId: string | null; // 关联的学习空间ID，null表示通用会话
   title: string;
   messages: Message[];
   createdAt: number;
   updatedAt: number;
-  draftMessage: string; // Session的草稿内容
+  draftMessage: string; // ChatInput输入框草稿
 }
 
 export interface ChatStore {
@@ -30,6 +31,7 @@ export interface ChatStore {
   currentAgentId: string | null;
   isStreaming: boolean;
   currentSessionId: string | null;
+  currentSpaceId: string | null; // 当前关联的学习空间ID
   sessions: ChatSession[];
 
   // Actions
@@ -44,11 +46,16 @@ export interface ChatStore {
   updateLastAssistantMessage: (content: string) => void;
 
   // Session management
-  createNewSession: (title?: string) => string;
+  createNewSession: (title?: string, spaceId?: string | null) => string;
   switchSession: (sessionId: string) => void;
   deleteSession: (sessionId: string) => void;
   updateSessionTitle: (sessionId: string, title: string) => void;
   getAllSessions: () => ChatSession[];
+  getSessionsBySpace: (spaceId: string) => ChatSession[]; // 获取特定空间的会话
+
+  // Space management
+  setCurrentSpace: (spaceId: string | null) => void; // 切换当前空间
+  switchToSpaceSession: (spaceId: string) => void; // 切换到特定空间的最新会话
 
   //  Draft management
   setSessionDraft: (sessionId: string, draft: string) => void;

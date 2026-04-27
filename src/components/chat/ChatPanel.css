@@ -33,6 +33,17 @@
   flex: 1;
 }
 
+.chat-panel-title-with-exit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.chat-panel-title-info {
+  flex: 1;
+}
+
 .chat-panel-title {
   font-size: 1.25rem;
   font-weight: 700;
@@ -44,6 +55,36 @@
   font-size: 0.875rem;
   color: #4b5563;
   margin: 0.25rem 0 0 0;
+}
+
+.chat-panel-exit-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #f9fafb;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.chat-panel-exit-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.chat-panel-exit-btn:active {
+  background: #e5e7eb;
+}
+
+.chat-panel-exit-btn svg {
+  flex-shrink: 0;
 }
 
 .chat-panel-streaming {

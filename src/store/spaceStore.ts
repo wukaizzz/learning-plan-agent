@@ -106,9 +106,11 @@ export const useSpaceStore = create<SpaceStore>()(
       // 获取所有空间（按活跃度排序）
       getAllSpaces: () => {
         const state = get();
-        return [...state.spaces].sort((a, b) =>
-          new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime()
-        );
+        return [...state.spaces]
+          .filter(s => !s.isDeleted) // 只返回未删除的空间
+          .sort((a, b) =>
+            new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime()
+          );
       },
 
       // 更新学习统计
@@ -127,10 +129,70 @@ export const useSpaceStore = create<SpaceStore>()(
         const state = get();
         const lowerQuery = query.toLowerCase();
         return state.spaces.filter(space =>
-          space.name.toLowerCase().includes(lowerQuery) ||
-          space.description.toLowerCase().includes(lowerQuery) ||
-          space.goal.primaryGoal.toLowerCase().includes(lowerQuery)
+          !space.isDeleted && (
+            space.name.toLowerCase().includes(lowerQuery) ||
+            space.description.toLowerCase().includes(lowerQuery) ||
+            space.goal.primaryGoal.toLowerCase().includes(lowerQuery)
+          )
         );
+      },
+
+      // 软删除学习空间（30天后永久删除）
+      softDeleteSpace: (spaceId) => {
+        set((state) => {
+          const space = state.spaces.find(s => s.id === spaceId);
+          if (space && !space.isDeleted) {
+            space.isDeleted = true;
+            space.deletedAt = new Date();
+            space.deletionScheduledAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30天后
+            space.updatedAt = new Date();
+
+            // 如果删除的是当前空间，切换到其他活跃空间
+            if (state.currentSpaceId === spaceId) {
+              const activeSpaces = state.spaces.filter(s => !s.isDeleted);
+              state.currentSpaceId = activeSpaces.length > 0 ? activeSpaces[0].id : null;
+            }
+          }
+        });
+      },
+
+      // 恢复已删除的学习空间
+      restoreSpace: (spaceId) => {
+        set((state) => {
+          const space = state.spaces.find(s => s.id === spaceId);
+          if (space && space.isDeleted) {
+            space.isDeleted = false;
+            space.deletedAt = undefined;
+            space.deletionScheduledAt = undefined;
+            space.updatedAt = new Date();
+            space.lastActiveAt = new Date(); // 更新活跃时间
+          }
+        });
+      },
+
+      // 永久删除学习空间
+      permanentlyDeleteSpace: (spaceId) => {
+        set((state) => {
+          state.spaces = state.spaces.filter(s => s.id !== spaceId);
+
+          // 如果删除的是当前空间，切换到其他活跃空间
+          if (state.currentSpaceId === spaceId) {
+            const activeSpaces = state.spaces.filter(s => !s.isDeleted);
+            state.currentSpaceId = activeSpaces.length > 0 ? activeSpaces[0].id : null;
+          }
+        });
+      },
+
+      // 获取已删除的空间列表
+      getDeletedSpaces: () => {
+        const state = get();
+        return state.spaces
+          .filter(s => s.isDeleted)
+          .sort((a, b) => {
+            const aTime = a.deletedAt ? new Date(a.deletedAt).getTime() : 0;
+            const bTime = b.deletedAt ? new Date(b.deletedAt).getTime() : 0;
+            return bTime - aTime; // 按删除时间倒序
+          });
       },
     })),
     {

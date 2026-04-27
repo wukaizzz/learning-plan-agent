@@ -1,0 +1,182 @@
+/* 侧边抽屉样式 */
+
+.side-drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 抽屉主体 */
+.side-drawer {
+  background: white;
+  height: 100%;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 右侧抽屉 */
+.side-drawer-right {
+  margin-left: auto;
+  animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* 左侧抽屉 */
+.side-drawer-left {
+  margin-right: auto;
+  animation: slideInLeft 0.3s ease;
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* 抽屉关闭动画 */
+.side-drawer-overlay.closing .side-drawer-right {
+  animation: slideOutRight 0.3s ease;
+}
+
+.side-drawer-overlay.closing .side-drawer-left {
+  animation: slideOutLeft 0.3s ease;
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes slideOutLeft {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/* 抽屉头部 */
+.side-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.side-drawer-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+  flex: 1;
+}
+
+.side-drawer-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #6b7280;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.side-drawer-close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.side-drawer-close:active {
+  background: #e5e7eb;
+}
+
+/* 抽屉内容区域 */
+.side-drawer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.side-drawer-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.side-drawer-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.side-drawer-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.side-drawer-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* 响应式设计 */
+@media (max-width: 640px) {
+  .side-drawer {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  .side-drawer-header {
+    padding: 16px 20px;
+  }
+
+  .side-drawer-content {
+    padding: 20px;
+  }
+}
+
+/* 平滑滚动 */
+.side-drawer-content {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 防止内容在动画期间闪烁 */
+.side-drawer {
+  will-change: transform;
+}

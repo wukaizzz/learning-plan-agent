@@ -60,6 +60,11 @@ export interface StudySpace {
     tasksCompleted: number;        // 已完成任务数
     tasksTotal: number;            // 总任务数
   };
+
+  // 软删除相关
+  isDeleted?: boolean;             // 是否已删除
+  deletedAt?: Date;                // 删除时间
+  deletionScheduledAt?: Date;      // 30天彻底删除时间
 }
 
 // ============== 学习空间 Store ==============
@@ -101,4 +106,10 @@ export interface SpaceStore {
 
   // 搜索空间
   searchSpaces: (query: string) => StudySpace[];
+
+  // 软删除相关
+  softDeleteSpace: (spaceId: string) => void;           // 软删除（30天后永久删除）
+  restoreSpace: (spaceId: string) => void;              // 恢复已删除的空间
+  permanentlyDeleteSpace: (spaceId: string) => void;    // 永久删除空间
+  getDeletedSpaces: () => StudySpace[];                 // 获取已删除的空间列表
 }

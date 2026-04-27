@@ -1,201 +1,275 @@
 /**
- * 学习空间列表组件
- * 这是一个实际的React组件示例，展示如何使用spaceStore
+ * 学习计划概览组件
+ * 展示当前学习空间的核心信息和统计数据
  */
 
 import React from 'react';
 import { useSpaceStore } from '../../store/spaceStore';
 import './SpaceList.css';
 
+// 图标组件
+const TargetIcon: React.FC = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="10" cy="10" r="8" stroke="#8B5CF6" strokeWidth="2" fill="none"/>
+    <circle cx="10" cy="10" r="3" fill="#8B5CF6"/>
+  </svg>
+);
+
+const ClockIcon: React.FC = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="10" stroke="#3B82F6" strokeWidth="2" fill="none"/>
+    <path d="M12 6V12L16 14" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round"/>
+  </svg>
+);
+
+const CalendarIcon: React.FC = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="3" y="4" width="18" height="18" rx="2" stroke="#8B5CF6" strokeWidth="2" fill="none"/>
+    <path d="M16 2V6M8 2V6M3 10H21" stroke="#8B5CF6" strokeWidth="2" strokeLinecap="round"/>
+  </svg>
+);
+
+const FlagIcon: React.FC = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 15C4 15 6 5 8 5C12 5 14 7 14 7C14 7 14 3 20 3V21H4V15Z" stroke="#F59E0B" strokeWidth="2" fill="none"/>
+  </svg>
+);
+
+const ArrowUpIcon: React.FC = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 19V5M5 12L12 5L19 12" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const TaskIcon: React.FC = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9 11L12 14L22 4M22 4H18M22 4V8" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M22 12V20C22 20.9 21.1 20 20 20H4C2.9 20 2 20.9 2 22V4C2 2.9 2.9 2 4 2H12" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round"/>
+  </svg>
+);
+
+const InfoIcon: React.FC = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8" cy="8" r="7" stroke="#9CA3AF" strokeWidth="1.5" fill="none"/>
+    <path d="M8 5V8M8 11H8.1" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
+const ArrowRightIcon: React.FC = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 10H16M16 10L12 6M16 10L12 14" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 export const SpaceList: React.FC = () => {
   const {
-    spaces,
-    currentSpaceId,
-    switchSpace,
-    deleteSpace,
-    getAllSpaces,
-    createSpace
+    getCurrentSpace
   } = useSpaceStore();
 
-  const [showCreateForm, setShowCreateForm] = React.useState(false);
+  const currentSpace = getCurrentSpace();
 
-  // 获取按活跃度排序的空间列表
-  const sortedSpaces = getAllSpaces();
-
-  // 创建新空间的简单实现
-  const handleCreateQuickSpace = () => {
-    const newSpaceId = createSpace({
-      name: `学习空间 ${spaces.length + 1}`,
-      description: '点击编辑设置详细描述',
-      goal: {
-        primaryGoal: '设置你的学习目标',
-        secondaryGoals: [],
-        examDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30天后
-        targetScore: 85
-      },
-      subjects: [{
-        name: '主要学科',
-        currentLevel: 60,
-        targetLevel: 85,
-        weight: 1.0,
-        weakPoints: [],
-        strongPoints: []
-      }],
-      schedule: {
-        availableHoursPerDay: 2,
-        availableDays: ['周一', '周二', '周三', '周四', '周五'],
-        preferredTimeSlots: ['晚上'],
-        restDays: ['周六', '周日'],
-        startDate: new Date()
-      }
-    });
-
-    // 自动切换到新创建的空间
-    switchSpace(newSpaceId);
-  };
-
-  // 处理空间切换
-  const handleSpaceClick = (spaceId: string) => {
-    switchSpace(spaceId);
-  };
-
-  // 处理删除空间
-  const handleDeleteSpace = (e: React.MouseEvent, spaceId: string) => {
-    e.stopPropagation(); // 防止触发空间切换
-
-    if (spaces.length === 1) {
-      alert('至少保留一个学习空间');
-      return;
-    }
-
-    if (confirm('确定要删除这个学习空间吗？相关的聊天记录和任务也会被删除。')) {
-      deleteSpace(spaceId);
-    }
-  };
+  // 如果没有学习空间，显示创建提示
+  if (!currentSpace) {
+    return (
+      <div className="space-overview-card">
+        <div className="overview-empty-state">
+          <div className="empty-icon">📚</div>
+          <h3>还没有学习空间</h3>
+          <p>创建你的第一个学习目标吧！</p>
+          <button className="btn-create-first-space">
+            + 创建学习空间
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // 计算距离考试的天数
-  const getDaysUntilExam = (examDate: Date) => {
+  const getDaysUntilExam = () => {
+    if (!currentSpace?.goal.examDate) return 0;
     const now = new Date();
-    const examTime = new Date(examDate).getTime();
+    const examTime = new Date(currentSpace.goal.examDate).getTime();
     const diff = examTime - now.getTime();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    return days > 0 ? days : 0;
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   };
 
-  // 获取状态对应的样式类
-  const getStatusClass = (status: string) => {
-    switch (status) {
-      case 'active': return 'status-active';
-      case 'planning': return 'status-planning';
-      case 'paused': return 'status-paused';
-      case 'completed': return 'status-completed';
-      default: return '';
-    }
-  };
+  const daysUntilExam = getDaysUntilExam();
+  const examDate = currentSpace?.goal.examDate
+    ? new Date(currentSpace.goal.examDate).toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long'
+      })
+    : '';
+
+  // 获取每日可投入时间
+  const dailyHours = currentSpace?.schedule?.availableHoursPerDay || 2;
+  const dailyMinutes = Math.round(dailyHours * 60);
+
+  // 获取优先科目（薄弱科目）
+  const weakSubjects = currentSpace?.subjects
+    ?.filter(subject => subject.weakPoints && subject.weakPoints.length > 0)
+    .slice(0, 3) || [];
+
+  // 获取所有薄弱点
+  const allWeakPoints = currentSpace?.subjects
+    ?.flatMap(subject => subject.weakPoints || [])
+    .slice(0, 4) || [];
 
   return (
-    <div className="space-list">
-      {/* 头部 */}
-      <div className="space-list-header">
-        <h3>学习空间</h3>
-        <button
-          className="btn-create-space"
-          onClick={handleCreateQuickSpace}
-          title="创建新的学习空间"
-        >
-          <span>+</span>
-        </button>
-      </div>
+    <div className="space-overview-card">
+      {/* 1. 整体容器 - 白色圆角卡片 */}
+      <div className="overview-container">
 
-      {/* 空间列表 */}
-      <div className="space-items">
-        {sortedSpaces.length === 0 ? (
-          <div className="empty-state">
-            <p>还没有学习空间</p>
-            <button onClick={handleCreateQuickSpace}>创建第一个空间</button>
-          </div>
-        ) : (
-          sortedSpaces.map(space => (
-            <div
-              key={space.id}
-              className={`space-item ${space.id === currentSpaceId ? 'space-item-active' : ''}`}
-              onClick={() => handleSpaceClick(space.id)}
-              style={{ borderLeftColor: space.color }}
-            >
-              {/* 空间头部 */}
-              <div className="space-item-header">
-                <h4 className="space-name">{space.name}</h4>
-                <span className={`space-status ${getStatusClass(space.status)}`}>
-                  {space.status === 'active' ? '学习中' :
-                   space.status === 'planning' ? '规划中' :
-                   space.status === 'paused' ? '已暂停' : '已完成'}
-                </span>
-              </div>
-
-              {/* 空间描述 */}
-              <p className="space-description">{space.description}</p>
-
-              {/* 学习目标 */}
-              <div className="space-goal">
-                <span className="goal-label">目标:</span>
-                <span className="goal-text">{space.goal.primaryGoal}</span>
-              </div>
-
-              {/* 考试倒计时 */}
-              <div className="space-countdown">
-                <span className="countdown-label">
-                  距离考试还有 <strong>{getDaysUntilExam(space.goal.examDate)}</strong> 天
-                </span>
-              </div>
-
-              {/* 进度信息 */}
-              <div className="space-progress">
-                <div className="progress-bar">
-                  <div
-                    className="progress-fill"
-                    style={{ width: `${space.stats.overallProgress}%` }}
-                  />
-                </div>
-                <span className="progress-text">{space.stats.overallProgress}%</span>
-              </div>
-
-              {/* 学习统计 */}
-              <div className="space-stats">
-                <div className="stat-item">
-                  <span className="stat-label">学习时长</span>
-                  <span className="stat-value">{space.stats.totalStudyHours}h</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">连续学习</span>
-                  <span className="stat-value">{space.stats.consecutiveDays}天</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">完成进度</span>
-                  <span className="stat-value">
-                    {space.stats.tasksCompleted}/{space.stats.tasksTotal}
-                  </span>
-                </div>
-              </div>
-
-              {/* 删除按钮 */}
-              <button
-                className="btn-delete-space"
-                onClick={(e) => handleDeleteSpace(e, space.id)}
-                title="删除学习空间"
-              >
-                🗑️
-              </button>
+        {/* 2. 顶部标题栏 */}
+        <div className="overview-header">
+          <div className="header-left">
+            <div className="header-icon-wrapper">
+              <TargetIcon />
             </div>
-          ))
-        )}
-      </div>
+            <div className="header-titles">
+              <h1 className="header-title">学习计划概览</h1>
+              <p className="header-subtitle">你的学习计划执行情况</p>
+            </div>
+          </div>
+          <div className="header-right">
+            <div className="status-badge">
+              <span className="status-dot"></span>
+              <span className="status-text">计划状态：正常</span>
+            </div>
+          </div>
+        </div>
 
-      {/* 底部信息 */}
-      <div className="space-list-footer">
-        <span className="space-count">{spaces.length} 个学习空间</span>
+        {/* 3. 学习目标 + 整体进度 */}
+        <div className="overview-progress-section">
+          <div className="goal-section">
+            <div className="section-label">学习目标</div>
+            <div className="goal-title">
+              {currentSpace.goal.examDate
+                ? `${currentSpace.goal.examDate.getFullYear()}年${(currentSpace.goal.examDate.getMonth() + 1)}月${currentSpace.goal.examDate.getDate()}日前通过 ${currentSpace.name}`
+                : currentSpace.name
+              }
+            </div>
+          </div>
+
+          <div className="progress-section">
+            <div className="progress-header">
+              <span className="section-label">整体进度</span>
+              <InfoIcon />
+            </div>
+            <div className="progress-main">
+              <div className="progress-percentage">{currentSpace.stats.overallProgress}%</div>
+              <div className="progress-bar-container">
+                <div
+                  className="progress-bar-fill"
+                  style={{ width: `${currentSpace.stats.overallProgress}%` }}
+                />
+              </div>
+            </div>
+            <div className="progress-encouragement">
+              坚持得很好！继续保持 🤝
+            </div>
+          </div>
+        </div>
+
+        {/* 4. 核心数据卡片区 (2×2网格) */}
+        <div className="overview-stats-grid">
+          {/* 左上：每日可投入时间 */}
+          <div className="stat-card stat-card-blue">
+            <div className="stat-icon-blue">
+              <ClockIcon />
+            </div>
+            <div className="stat-content">
+              <div className="stat-title">每日可投入时间</div>
+              <div className="stat-value">{dailyHours} 小时/天</div>
+              <div className="stat-subtitle">约 {dailyMinutes} 分钟</div>
+            </div>
+          </div>
+
+          {/* 右上：距离考试还有 */}
+          <div className="stat-card stat-card-purple">
+            <div className="stat-icon-purple">
+              <CalendarIcon />
+            </div>
+            <div className="stat-content">
+              <div className="stat-title">距离考试还有</div>
+              <div className="stat-value">{daysUntilExam} 天</div>
+              <div className="stat-subtitle">{examDate}</div>
+            </div>
+          </div>
+
+          {/* 左下：优先学习科目 */}
+          <div className="stat-card stat-card-orange">
+            <div className="stat-icon-orange">
+              <FlagIcon />
+            </div>
+            <div className="stat-content stat-content-with-badge">
+              <div className="stat-title">优先学习科目</div>
+              <div className="stat-badge stat-badge-orange">{weakSubjects.length}</div>
+            </div>
+            <div className="stat-tags">
+              {weakSubjects.length > 0 ? (
+                weakSubjects.map((subject, index) => (
+                  <span key={index} className="tag tag-orange">{subject.name}</span>
+                ))
+              ) : (
+                <span className="tag tag-orange">暂无</span>
+              )}
+            </div>
+          </div>
+
+          {/* 右下：薄弱科目 */}
+          <div className="stat-card stat-card-red">
+            <div className="stat-icon-red">
+              <ArrowUpIcon />
+            </div>
+            <div className="stat-content stat-content-with-badge">
+              <div className="stat-title">薄弱科目</div>
+              <div className="stat-badge stat-badge-red">{allWeakPoints.length}</div>
+            </div>
+            <div className="stat-tags">
+              {allWeakPoints.length > 0 ? (
+                allWeakPoints.slice(0, 2).map((weakPoint, index) => (
+                  <span key={index} className="tag tag-red">{weakPoint}</span>
+                ))
+              ) : (
+                <span className="tag tag-red">暂无</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 5. 待完成任务栏 */}
+        <div className="overview-tasks-section">
+          <div className="tasks-icon">
+            <TaskIcon />
+          </div>
+          <div className="tasks-content">
+            <div className="tasks-title">待完成任务</div>
+            <div className="tasks-subtitle">需要你完成的学习任务</div>
+          </div>
+          <div className="tasks-count">
+            <span className="tasks-number">{currentSpace.stats.tasksTotal - currentSpace.stats.tasksCompleted}</span>
+            <ArrowRightIcon />
+          </div>
+        </div>
+
+        {/* 6. 底部说明 + 操作栏 */}
+        <div className="overview-footer">
+          <div className="footer-left">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="8" cy="8" r="7" stroke="#9CA3AF" strokeWidth="1.5" fill="none"/>
+              <path d="M8 5H8.1M8 11H8.1" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <span className="footer-text">根据你的执行反馈，计划将持续优化调整</span>
+          </div>
+          <div className="footer-right">
+            <span className="footer-link">查看详细计划 {'>'}</span>
+          </div>
+        </div>
+
       </div>
     </div>
   );
 };
-
-export default SpaceList;

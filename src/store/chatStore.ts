@@ -12,6 +12,7 @@ export const useChatStore = create<ChatStore>()(
       currentAgentId: null,
       isStreaming: false,
       currentSessionId: null,
+      currentSpaceId: null, // 当前关联的学习空间ID
       sessions: [],
 
       addMessage: (message: Message) => set((state) => {
@@ -140,21 +141,26 @@ export const useChatStore = create<ChatStore>()(
       }),
 
       // Session management
-      createNewSession: (title?: string) => {
+      createNewSession: (title?: string, spaceId?: string | null) => {
         const sessionId = generateId();
         const newSession: ChatSession = {
           id: sessionId,
+          spaceId: spaceId || get().currentSpaceId, // 关联到当前空间或指定的空间
           title: title || '新对话',
           messages: [],
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          draftMessage: '' 
+          draftMessage: ''
         };
 
         set((state) => {
           state.sessions.unshift(newSession);
           state.currentSessionId = sessionId;
           state.messages = [];
+          // 更新当前空间ID
+          if (spaceId) {
+            state.currentSpaceId = spaceId;
+          }
         });
 
         return sessionId;
@@ -166,6 +172,10 @@ export const useChatStore = create<ChatStore>()(
           if (session) {
             state.currentSessionId = sessionId;
             state.messages = session.messages;
+            // 同时更新 currentSpaceId，确保空间关联正确
+            if (session.spaceId !== state.currentSpaceId) {
+              state.currentSpaceId = session.spaceId;
+            }
           }
         });
       },
@@ -200,6 +210,11 @@ export const useChatStore = create<ChatStore>()(
         return get().sessions;
       },
 
+      getSessionsBySpace: (spaceId: string) => {
+        const state = get();
+        return state.sessions.filter(s => s.spaceId === spaceId);
+      },
+
       //  Draft management
       setSessionDraft: (sessionId: string, draft: string) => {
         set((state) => {
@@ -225,6 +240,33 @@ export const useChatStore = create<ChatStore>()(
             session.updatedAt = Date.now();
           }
         });
+      },
+
+      // Space management
+      setCurrentSpace: (spaceId: string | null) => {
+        set((state) => {
+          state.currentSpaceId = spaceId;
+        });
+      },
+
+      switchToSpaceSession: (spaceId: string) => {
+        const state = get();
+        // 查找该空间的最新会话
+        const spaceSessions = state.sessions.filter(s => s.spaceId === spaceId);
+
+        if (spaceSessions.length > 0) {
+          // 切换到该空间的最新会话
+          const latestSession = spaceSessions.sort((a, b) => b.updatedAt - a.updatedAt)[0];
+          get().switchSession(latestSession.id);
+        } else {
+          // 如果该空间没有会话，创建一个新会话
+          const sessionId = get().createNewSession('新对话', spaceId);
+          set((state) => {
+            state.currentSessionId = sessionId;
+            state.currentSpaceId = spaceId;
+            state.messages = [];
+          });
+        }
       }
     })),
     {
@@ -233,6 +275,7 @@ export const useChatStore = create<ChatStore>()(
         messages: state.messages,
         currentAgentId: state.currentAgentId,
         currentSessionId: state.currentSessionId,
+        currentSpaceId: state.currentSpaceId,
         sessions: state.sessions
       })
     }
