@@ -1,5 +1,5 @@
 import React from 'react';
-import { useChatStore } from '../../store/chatStore';
+import { useChatStore } from '../../../store/chatStore';
 import { Plus, MessageSquare, Trash2, Clock } from 'lucide-react';
 import './SessionList.css';
 

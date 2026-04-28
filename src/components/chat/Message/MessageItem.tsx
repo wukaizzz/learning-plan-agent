@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { Message } from '../../types/chat';
-import { formatTimestamp } from '../../utils/messageFormatter';
+import type { Message } from '../../../types/chat';
+import { formatTimestamp } from '../../../utils/messageFormatter';
 // markdown支持
 import ReactMarkdown from 'react-markdown';
 // 高亮支持

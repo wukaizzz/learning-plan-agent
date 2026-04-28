@@ -8,6 +8,8 @@ export interface AgentConfig {
   max_tokens?: number;
   system_prompt?: string;
   tools: string[]; // Tool IDs that this agent can use
+  enableWorkflow?: boolean; // 🆕 是否启用工作流事件
+  autoTransition?: boolean; // 🆕 是否自动转换工作流状态
 }
 
 export interface AgentStore {

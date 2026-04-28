@@ -1,15 +1,122 @@
 import { useCallback, useRef } from 'react';
 import { useChat } from './useChat';
 import { useAgent } from './useAgent';
+import { useWorkflow } from './useWorkflow';
+import { useChatStore } from '../store/chatStore';
 import { API_ENDPOINT } from '../utils/constants';
 import type { Message } from '../types/chat';
+import type { WorkflowStepEvent, InfoNeededEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, UIBlockUpdateEvent } from '../types/workflowEvents';
 
 export function useStream() {
   const { addAssistantMessage, setStreaming, updateToolCall, updateLastAssistantMessage } = useChat();
   const { getCurrentAgentConfig } = useAgent();
+  const { transitionToState } = useWorkflow();
+  const { addUIBlock } = useChatStore();
   const currentMessageRef = useRef<string>('');
   const currentToolCallsRef = useRef<any[]>([]);
   const hasStartedStreaming = useRef<boolean>(false);
+
+  // 工作流事件处理函数
+  const handleWorkflowStep = useCallback((event: WorkflowStepEvent) => {
+    console.log('🔄 Workflow step:', event);
+    // 转换到对应的工作流状态
+    transitionToState(event.step);
+
+    // 可以在这里添加进度条更新逻辑
+    if (event.progress !== undefined) {
+      console.log(`Progress: ${event.progress}%`);
+    }
+  }, [transitionToState]);
+
+  const handleInfoNeeded = useCallback((event: InfoNeededEvent) => {
+    console.log('❓ Info needed:', event);
+    // 这里可以：
+    // 1. 显示输入框给用户
+    // 2. 在聊天中显示AI的问题
+    // 3. 将问题添加到消息列表
+    const questionMsg = `[需要信息] ${event.question}`;
+    if (!hasStartedStreaming.current) {
+      addAssistantMessage(questionMsg);
+      hasStartedStreaming.current = true;
+    } else {
+      currentMessageRef.current += `\n\n${questionMsg}`;
+      updateLastAssistantMessage(currentMessageRef.current);
+    }
+  }, [addAssistantMessage, updateLastAssistantMessage]);
+
+  const handleToolCall = useCallback((event: ToolCallEvent) => {
+    console.log('🔧 Tool call:', event);
+    // 更新工具调用状态
+    const toolCallData = {
+      id: `tool_${Date.now()}`,
+      tool_name: event.toolName,
+      parameters: event.parameters,
+      status: event.status,
+      result: event.result,
+      error: event.error
+    };
+
+    if (event.status === 'pending') {
+      currentToolCallsRef.current.push(toolCallData);
+    } else {
+      const existingCall = currentToolCallsRef.current.find(
+        tc => tc.tool_name === event.toolName
+      );
+      if (existingCall) {
+        Object.assign(existingCall, toolCallData);
+      }
+    }
+  }, []);
+
+  const handleProcessing = useCallback((event: ProcessingEvent) => {
+    console.log('⚙️ Processing:', event);
+    // 可以显示处理进度
+    if (event.progress !== undefined) {
+      console.log(`Processing progress: ${event.progress}%`);
+    }
+  }, []);
+
+  const handleAnalysisResult = useCallback((event: AnalysisResultEvent) => {
+    console.log('📊 Analysis result:', event);
+    // 将分析结果格式化为可读文本
+    let resultText = `\n\n📊 ${event.summary}\n`;
+    if (event.findings && event.findings.length > 0) {
+      resultText += '\n发现：\n';
+      event.findings.forEach(finding => {
+        resultText += `• ${finding}\n`;
+      });
+    }
+    if (event.recommendations && event.recommendations.length > 0) {
+      resultText += '\n建议：\n';
+      event.recommendations.forEach(rec => {
+        resultText += `• ${rec}\n`;
+      });
+    }
+
+    currentMessageRef.current += resultText;
+    if (!hasStartedStreaming.current) {
+      addAssistantMessage(currentMessageRef.current);
+      hasStartedStreaming.current = true;
+    } else {
+      updateLastAssistantMessage(currentMessageRef.current);
+    }
+  }, [addAssistantMessage, updateLastAssistantMessage]);
+
+  // 🆕 处理UI Block更新事件
+  const handleUIBlockUpdate = useCallback((event: UIBlockUpdateEvent) => {
+    console.log('🎨 UI Block update:', event);
+
+    if (event.action === 'add' && event.block) {
+      addUIBlock(event.block);
+    } else if (event.action === 'update' && event.block) {
+      // 更新现有block（需要先删除再添加，或者直接修改）
+      // 简化实现：直接添加新block
+      addUIBlock(event.block);
+    } else if (event.action === 'remove' && event.blockId) {
+      // 移除指定block（需要在chatStore中实现removeUIBlock方法）
+      console.log('Remove block:', event.blockId);
+    }
+  }, [addUIBlock]);
 
   const streamResponse = useCallback(async (
     messages: Message[],
@@ -83,15 +190,34 @@ export function useStream() {
                   }
                   break;
 
+                case 'workflow_step':
+                  // 处理工作流步骤事件
+                  handleWorkflowStep(chunk);
+                  break;
+
+                case 'info_needed':
+                  // 处理信息收集事件
+                  handleInfoNeeded(chunk);
+                  break;
+
                 case 'tool_call':
-                  if (chunk.tool_call) {
-                    currentToolCallsRef.current.push({
-                      id: chunk.tool_call.id,
-                      tool_name: chunk.tool_call.tool_name,
-                      parameters: chunk.tool_call.parameters,
-                      status: 'pending' as const
-                    });
-                  }
+                  // 处理工具调用事件
+                  handleToolCall(chunk);
+                  break;
+
+                case 'processing':
+                  // 处理处理进度事件
+                  handleProcessing(chunk);
+                  break;
+
+                case 'analysis_result':
+                  // 处理分析结果事件
+                  handleAnalysisResult(chunk);
+                  break;
+
+                case 'ui_block_update':
+                  // 🆕 处理UI Block更新事件
+                  handleUIBlockUpdate(chunk);
                   break;
 
                 case 'error':

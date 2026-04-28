@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { MessageList } from './MessageList';
-import { MessageInput } from './MessageInput';
+import { MessageList } from './Message/MessageList';
+import { MessageInput } from './Message/MessageInput';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-import { SessionList } from './SessionList';
-import { useChat, useStream, useAgent } from '../../hooks';
+import { SessionList } from './Message/SessionList';
+import { WorkflowSection } from './WorkflowSection';
+import { useChat, useStream, useAgent, useWorkflow } from '../../hooks';
 import { useChatStore } from '../../store/chatStore';
 import { useSpaceStore } from '../../store/spaceStore';
 import type { Message } from '../../types/chat';
@@ -19,7 +20,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
   const { messages, isStreaming, addUserMessage } = useChat();
   const { streamResponse } = useStream();
   const { getCurrentAgentConfig } = useAgent();
-  const { currentSessionId, createNewSession, switchToSpaceSession, setCurrentSpace } = useChatStore();
+  const { currentSessionId, createNewSession, switchToSpaceSession, setCurrentSpace, workspaceState, uiBlocks } = useChatStore();
+  const { transitionToState, isWorkflowActive } = useWorkflow();
   const navigate = useNavigate();
   const { spaceId } = useParams();
   const { getCurrentSpace } = useSpaceStore();
@@ -78,6 +80,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
 
       {/* Main Chat Panel */}
       <div className="chat-panel">
+        {/* 🆕 工作流展示区域 - 根据状态自动显示 */}
+        {isWorkflowActive && (
+          <WorkflowSection
+            workspaceState={workspaceState}
+            uiBlocks={uiBlocks}
+            onStateChange={transitionToState}
+          />
+        )}
+
         {/* Header */}
         <div className="chat-panel-header">
           <div className="chat-panel-header-content">

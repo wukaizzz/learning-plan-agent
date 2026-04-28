@@ -1,0 +1,219 @@
+/**
+ * WorkspaceWorkflow 组件样式
+ * 用于演示 Agent 工作流和 Schema-Driven UI 系统
+ */
+
+.workspace-workflow {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.workflow-header {
+  text-align: center;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.workflow-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.workflow-description {
+  margin: 0;
+  font-size: 16px;
+  color: #6b7280;
+}
+
+/* 工作流控制面板 */
+.workflow-controls {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.workflow-controls h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.state-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.state-button {
+  padding: 8px 16px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.state-button:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.state-button.active {
+  background: #3b82f6;
+  color: #ffffff;
+  border-color: #3b82f6;
+  font-weight: 600;
+}
+
+.current-state-display {
+  margin: 0;
+  padding: 12px;
+  background: #eff6ff;
+  border-left: 4px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.current-state-display strong {
+  color: #3b82f6;
+  font-weight: 700;
+}
+
+/* UI Blocks 渲染区域 */
+.blocks-container {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.blocks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+.blocks-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.blocks-count {
+  font-size: 14px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.blocks-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.blocks-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.blocks-empty p {
+  margin: 8px 0;
+  font-size: 16px;
+}
+
+.blocks-empty strong {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.blocks-empty .hint {
+  font-size: 14px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* 调试信息 */
+.workflow-debug {
+  background: #1f2937;
+  color: #f9fafb;
+  border-radius: 8px;
+  padding: 16px;
+  font-family: 'Courier New', monospace;
+}
+
+.workflow-debug h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.debug-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.debug-content p {
+  margin: 0;
+}
+
+.debug-content strong {
+  color: #34d399;
+  font-weight: 600;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .workspace-workflow {
+    padding: 16px;
+  }
+
+  .workflow-header h2 {
+    font-size: 22px;
+  }
+
+  .workflow-description {
+    font-size: 14px;
+  }
+
+  .state-buttons {
+    flex-direction: column;
+  }
+
+  .state-button {
+    width: 100%;
+  }
+
+  .blocks-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}

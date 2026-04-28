@@ -112,4 +112,7 @@ export interface SpaceStore {
   restoreSpace: (spaceId: string) => void;              // 恢复已删除的空间
   permanentlyDeleteSpace: (spaceId: string) => void;    // 永久删除空间
   getDeletedSpaces: () => StudySpace[];                 // 获取已删除的空间列表
+
+  // 🆕 字段更新相关
+  updateSpaceFields: (spaceId: string, fieldsData: Record<string, any>) => void;  // 更新特定字段（支持嵌套路径）
 }

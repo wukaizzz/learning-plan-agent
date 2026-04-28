@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Button } from '../common/Button';
-import { useChatStore } from '../../store/chatStore';
+import { Button } from '../../common/Button';
+import { useChatStore } from '../../../store/chatStore';
 import './MessageInput.css';
 
 interface MessageInputProps {

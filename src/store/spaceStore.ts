@@ -170,6 +170,58 @@ export const useSpaceStore = create<SpaceStore>()(
         });
       },
 
+      // 🆕 更新空间的特定字段（支持嵌套路径，如 "goal.examDate"）
+      updateSpaceFields: (spaceId: string, fieldsData: Record<string, any>) => {
+        set((state) => {
+          const space = state.spaces.find(s => s.id === spaceId);
+          if (!space) return;
+
+          // 遍历所有字段数据
+          Object.entries(fieldsData).forEach(([fieldPath, value]) => {
+            const parts = fieldPath.split('.');
+            let current = space as any;
+
+            // 遍历路径，找到要更新的对象
+            for (let i = 0; i < parts.length - 1; i++) {
+              const part = parts[i];
+
+              // 处理数组字段（如 subjects[]）
+              if (part.endsWith('[]')) {
+                // 对于数组字段，暂时跳过或者特殊处理
+                continue;
+              }
+
+              if (!current[part]) {
+                current[part] = {};
+              }
+              current = current[part];
+            }
+
+            // 设置最终值
+            const lastPart = parts[parts.length - 1];
+
+            // 处理数组字段（如 subjects）
+            if (lastPart.endsWith('[]')) {
+              const arrayField = lastPart.slice(0, -2);
+              if (!current[arrayField]) {
+                current[arrayField] = [];
+              }
+              // 如果是数组，合并值
+              if (Array.isArray(value)) {
+                current[arrayField] = [...current[arrayField], ...value];
+              } else {
+                current[arrayField].push(value);
+              }
+            } else {
+              current[lastPart] = value;
+            }
+          });
+
+          space.updatedAt = new Date();
+          space.lastActiveAt = new Date();
+        });
+      },
+
       // 永久删除学习空间
       permanentlyDeleteSpace: (spaceId) => {
         set((state) => {

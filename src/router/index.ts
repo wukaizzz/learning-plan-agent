@@ -1,7 +1,7 @@
-import { createBrowserRouter,Navigate } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 import React from 'react';
-import { ChatPanel } from '@/components';
-import { WorkSpacePanel } from '@/components/workspace/WorkSpacePanel';
+import { ChatPanel } from '../components/chat/ChatPanel';
+import { WorkSpacePanel } from '../components/workspace/WorkSpacePanel';
 
 const router = createBrowserRouter([
   {

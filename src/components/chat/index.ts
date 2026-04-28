@@ -1,3 +1,3 @@
 export { ChatPanel } from './ChatPanel';
-export { MessageList } from './MessageList';
-export { MessageInput } from './MessageInput';
+export { MessageList } from './Message/MessageList';
+export { MessageInput } from './Message/MessageInput';

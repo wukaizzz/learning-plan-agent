@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { ChatStore, Message, ChatSession } from '../types/chat';
+import type { ChatStore, Message, ChatSession, WorkspaceState } from '../types/chat';
+import type { UIBlock } from '../types/uiBlocks';
 
 const generateId = () => `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
@@ -13,6 +14,8 @@ export const useChatStore = create<ChatStore>()(
       isStreaming: false,
       currentSessionId: null,
       currentSpaceId: null, // 当前关联的学习空间ID
+      workspaceState: 'empty' as WorkspaceState, //  工作流状态
+      uiBlocks: [], //  当前显示的UI Blocks
       sessions: [],
 
       addMessage: (message: Message) => set((state) => {
@@ -150,7 +153,8 @@ export const useChatStore = create<ChatStore>()(
           messages: [],
           createdAt: Date.now(),
           updatedAt: Date.now(),
-          draftMessage: ''
+          draftMessage: '',
+          scrollPosition: 0 // 初始化滚动位置
         };
 
         set((state) => {
@@ -267,6 +271,42 @@ export const useChatStore = create<ChatStore>()(
             state.messages = [];
           });
         }
+      },
+
+      // 🆕 工作流和Block管理
+      setWorkspaceState: (newState: WorkspaceState) => set((state) => {
+        state.workspaceState = newState;
+      }),
+
+      setUIBlocks: (blocks: UIBlock[]) => set((state) => {
+        state.uiBlocks = blocks;
+      }),
+
+      addUIBlock: (block: UIBlock) => set((state) => {
+        state.uiBlocks.push(block);
+      }),
+
+      clearUIBlocks: () => set((state) => {
+        state.uiBlocks = [];
+      }),
+
+      getWorkspaceState: () => {
+        const state = get();
+        return state.workspaceState;
+      },
+
+      // 🆕 Scroll position management
+      saveScrollPosition: (sessionId: string, position: number) => set((state) => {
+        const session = state.sessions.find(s => s.id === sessionId);
+        if (session) {
+          session.scrollPosition = position;
+        }
+      }),
+
+      getScrollPosition: (sessionId: string) => {
+        const state = get();
+        const session = state.sessions.find(s => s.id === sessionId);
+        return session?.scrollPosition || 0;
       }
     })),
     {

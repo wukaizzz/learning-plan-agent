@@ -1,0 +1,285 @@
+/**
+ * WorkflowIndicator UI Block Styles
+ * 工作流进度指示器样式
+ */
+
+.workflow-indicator-container {
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.workflow-indicator-title {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  text-align: center;
+}
+
+.workflow-indicator-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 水平步骤条容器 */
+.workflow-steps-horizontal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  padding: 20px 10px;
+}
+
+/* 单个步骤容器 */
+.workflow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex: 1;
+  z-index: 2;
+}
+
+/* 步骤圆圈 */
+.workflow-step-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  border: 3px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  margin-bottom: 12px;
+}
+
+/* 已完成状态的圆圈 */
+.workflow-step-completed .workflow-step-circle {
+  background: #10b981;
+  border-color: #10b981;
+}
+
+/* 当前状态的圆圈 */
+.workflow-step-current .workflow-step-circle {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+  animation: pulse 2s infinite;
+}
+
+/* 待处理状态的圆圈 */
+.workflow-step-pending .workflow-step-circle {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+}
+
+/* 步骤图标 */
+.workflow-step-icon {
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workflow-step-icon.completed {
+  color: #ffffff;
+}
+
+.workflow-step-icon.current {
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.workflow-step-icon.pending {
+  color: #9ca3af;
+}
+
+/* 步骤标签 */
+.workflow-step-label {
+  text-align: center;
+  max-width: 120px;
+}
+
+.workflow-step-label-text {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workflow-step-completed .workflow-step-label-text {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.workflow-step-current .workflow-step-label-text {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+/* 当前步骤的详细操作说明 */
+.workflow-step-current-action {
+  display: block;
+  font-size: 12px;
+  color: #3b82f6;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: fadeIn 0.3s ease;
+}
+
+/* 步骤连接线 */
+.workflow-step-line {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  width: calc(100% - 40px);
+  height: 3px;
+  background: #e5e7eb;
+  transform: translateY(-50%);
+  z-index: 1;
+  transition: background 0.3s ease;
+}
+
+.workflow-step-line.completed {
+  background: #10b981;
+}
+
+/* 当前状态描述 */
+.workflow-current-state {
+  padding: 12px 16px;
+  background: #eff6ff;
+  border-left: 4px solid #3b82f6;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slideIn 0.3s ease;
+}
+
+.workflow-current-state-label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.workflow-current-state-value {
+  font-size: 14px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+/* 动画效果 */
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .workflow-indicator-container {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .workflow-indicator-title {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+
+  .workflow-steps-horizontal {
+    padding: 15px 5px;
+  }
+
+  .workflow-step-circle {
+    width: 32px;
+    height: 32px;
+  }
+
+  .workflow-step-icon {
+    font-size: 14px;
+  }
+
+  .workflow-step-label-text {
+    font-size: 12px;
+  }
+
+  .workflow-step-current-action {
+    font-size: 11px;
+  }
+
+  .workflow-step-line {
+    top: 32px;
+  }
+
+  .workflow-current-state {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* 极小屏幕可以考虑改为垂直布局 */
+  .workflow-steps-horizontal {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .workflow-step-line {
+    display: none;
+  }
+
+  .workflow-step {
+    width: 100%;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+  }
+
+  .workflow-step-circle {
+    margin-bottom: 0;
+  }
+
+  .workflow-step-label {
+    text-align: left;
+    max-width: none;
+  }
+}

@@ -1,0 +1,180 @@
+/**
+ * ToolCallStatus UI Block Styles
+ */
+
+.tool-call-status-container {
+  padding: 16px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.tool-call-status-title {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.tool-call-status-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.current-step-indicator {
+  padding: 12px;
+  background: #eff6ff;
+  border-left: 4px solid #3b82f6;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.current-step-label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.current-step-name {
+  font-size: 14px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.steps-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.step-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.step-item:hover {
+  background-color: #f9fafb;
+}
+
+.step-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* 状态样式 */
+.step-status-pending .step-icon {
+  color: #9ca3af;
+}
+
+.step-status-running .step-icon {
+  color: #3b82f6;
+  animation: pulse 1.5s infinite;
+}
+
+.step-status-completed .step-icon {
+  color: #10b981;
+}
+
+.step-status-failed .step-icon {
+  color: #ef4444;
+}
+
+.step-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.step-running-indicator {
+  font-size: 12px;
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.step-message {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.step-result {
+  margin-top: 4px;
+}
+
+.result-summary {
+  font-size: 12px;
+  color: #4b5563;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.result-summary:hover {
+  background: #e5e7eb;
+}
+
+.result-content {
+  margin-top: 8px;
+  padding: 8px;
+  background: #1f2937;
+  color: #f9fafb;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-x: auto;
+  font-family: 'Courier New', monospace;
+}
+
+/* 动画效果 */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 640px) {
+  .tool-call-status-container {
+    padding: 12px;
+  }
+
+  .step-item {
+    padding: 8px;
+  }
+
+  .current-step-indicator {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

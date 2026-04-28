@@ -1,3 +1,6 @@
+// 导入UIBlock类型
+import type { UIBlock } from './uiBlocks';
+
 // Chat message types
 export interface Message {
   id: string;
@@ -6,6 +9,16 @@ export interface Message {
   timestamp: number;
   tool_calls?: ToolCall[];
 }
+
+// 工作流状态类型（用于导入）
+export type WorkspaceState =
+  | 'empty'
+  | 'collecting'
+  | 'analyzing'
+  | 'generating'
+  | 'reviewing'
+  | 'finalized'
+  | 'paused';
 
 export interface ToolCall {
   id: string;
@@ -24,6 +37,7 @@ export interface ChatSession {
   createdAt: number;
   updatedAt: number;
   draftMessage: string; // ChatInput输入框草稿
+  scrollPosition: number; // 🆕 保存滚动位置
 }
 
 export interface ChatStore {
@@ -32,6 +46,8 @@ export interface ChatStore {
   isStreaming: boolean;
   currentSessionId: string | null;
   currentSpaceId: string | null; // 当前关联的学习空间ID
+  workspaceState: WorkspaceState; // 🆕 工作流状态
+  uiBlocks: UIBlock[]; // 🆕 当前显示的UI Blocks
   sessions: ChatSession[];
 
   // Actions
@@ -57,8 +73,19 @@ export interface ChatStore {
   setCurrentSpace: (spaceId: string | null) => void; // 切换当前空间
   switchToSpaceSession: (spaceId: string) => void; // 切换到特定空间的最新会话
 
+  // 🆕 Workflow and Block management
+  setWorkspaceState: (state: WorkspaceState) => void; // 设置工作流状态
+  setUIBlocks: (blocks: UIBlock[]) => void; // 设置当前显示的UI Blocks
+  addUIBlock: (block: UIBlock) => void; // 添加单个UI Block
+  clearUIBlocks: () => void; // 清除所有UI Blocks
+  getWorkspaceState: () => WorkspaceState; // 获取当前工作流状态
+
   //  Draft management
   setSessionDraft: (sessionId: string, draft: string) => void;
   getSessionDraft: (sessionId: string) => string;
   clearSessionDraft: (sessionId: string) => void;
+
+  // 🆕 Scroll position management
+  saveScrollPosition: (sessionId: string, position: number) => void;
+  getScrollPosition: (sessionId: string) => number;
 }
