@@ -4,8 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import { useSpaceStore } from '../../store/spaceStore';
-import type { StudySpace } from '../../types/space';
+import { useSpaceStore } from '../../../store/spaceStore';
+import type { StudySpace } from '../../../types/space';
 import './EditSpaceForm.css';
 
 export interface EditSpaceFormProps {

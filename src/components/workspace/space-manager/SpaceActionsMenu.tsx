@@ -4,7 +4,7 @@
  */
 
 import React, { useRef, useEffect, useState } from 'react';
-import type { StudySpace } from '../../types/space';
+import type { StudySpace } from '@/types/space';
 import './SpaceActionsMenu.css';
 
 export interface SpaceActionsMenuProps {

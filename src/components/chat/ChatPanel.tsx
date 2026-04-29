@@ -1,14 +1,12 @@
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { MessageList } from './Message/MessageList';
-import { MessageInput } from './Message/MessageInput';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-import { SessionList } from './Message/SessionList';
+import { MessageList,MessageInput,SessionList } from '@/components/chat/Message'; 
 import { WorkflowSection } from './WorkflowSection';
-import { useChat, useStream, useAgent, useWorkflow } from '../../hooks';
-import { useChatStore } from '../../store/chatStore';
-import { useSpaceStore } from '../../store/spaceStore';
-import type { Message } from '../../types/chat';
+import { useChat, useStream, useAgent, useWorkflow } from '@/hooks';
+import { useChatStore,useSpaceStore } from '@/store';
+import type { Message } from '@/types';
+
 import './ChatPanel.css';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type

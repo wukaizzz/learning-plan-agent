@@ -5,8 +5,8 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router';
-import type { StudySpace } from '../../types/space';
-import { useSpaceStore } from '../../store/spaceStore';
+import type { StudySpace } from '../../../types/space';
+import { useSpaceStore } from '../../../store/spaceStore';
 import './SpaceCard.css';
 
 interface SpaceCardProps {

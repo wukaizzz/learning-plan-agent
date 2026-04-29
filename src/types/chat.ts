@@ -1,6 +1,6 @@
 // 导入UIBlock类型
 import type { UIBlock } from './uiBlocks';
-
+import type { WorkspaceState } from './uiBlocks';
 // Chat message types
 export interface Message {
   id: string;
@@ -9,16 +9,6 @@ export interface Message {
   timestamp: number;
   tool_calls?: ToolCall[];
 }
-
-// 工作流状态类型（用于导入）
-export type WorkspaceState =
-  | 'empty'
-  | 'collecting'
-  | 'analyzing'
-  | 'generating'
-  | 'reviewing'
-  | 'finalized'
-  | 'paused';
 
 export interface ToolCall {
   id: string;

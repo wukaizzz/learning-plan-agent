@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import type { StudySpace } from '../../types/space';
+import type { StudySpace } from '../../../types/space';
 import './DeletedSpacesList.css';
 
 export interface DeletedSpacesListProps {

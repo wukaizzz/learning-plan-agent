@@ -4,8 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import { useSpaceStore } from '../../store/spaceStore';
-import type { StudyGoal, Subject, TimeSchedule } from '../../types/space';
+import { useSpaceStore } from '../../../store/spaceStore';
+import type { StudyGoal, Subject, TimeSchedule } from '../../../types/space';
 import './CreateSpaceWizard.css';
 
 type WizardStep = 'basic' | 'goal' | 'subjects' | 'schedule' | 'review';
