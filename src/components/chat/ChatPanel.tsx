@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-import { MessageList,MessageInput,SessionList } from '@/components/chat/Message'; 
+import { MessageList,MessageInput,SessionList } from '@/components/chat/message'; 
 import { WorkflowSection } from './WorkflowSection';
 import { useChat, useStream, useAgent, useWorkflow } from '@/hooks';
 import { useChatStore,useSpaceStore } from '@/store';

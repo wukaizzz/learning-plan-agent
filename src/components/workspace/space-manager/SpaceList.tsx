@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { useSpaceStore } from '../../store/spaceStore';
+import { useSpaceStore } from '@/store';
 import './SpaceList.css';
 
 // 图标组件

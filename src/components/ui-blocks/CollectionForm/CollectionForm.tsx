@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Select } from '../../ui/select';
-import { DatePicker } from '../../ui/date-picker';
-import { Input } from '../../ui/input';
-import { Textarea } from '../../ui/textarea';
+import { Select } from './select';
+import { DatePicker } from './date-picker';
+import { Input,Textarea } from '@/components/ui'
 import './CollectionForm.css';
 
 // 表单字段定义
@@ -128,7 +127,7 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
             </label>
             <Select
               value={value}
-              onChange={(val) => handleFieldChange(field.name, val)}
+              onChange={(val: string) => handleFieldChange(field.name, val)}
               options={field.options || []}
               placeholder={field.placeholder}
               error={error}
@@ -145,7 +144,7 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
             </label>
             <DatePicker
               value={value}
-              onChange={(val) => handleFieldChange(field.name, val)}
+              onChange={(val: string) => handleFieldChange(field.name, val)}
               placeholder={field.placeholder}
               error={error}
             />
@@ -160,6 +159,7 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
               {field.required && <span className="collection-form-required">*</span>}
             </label>
             <Textarea
+              className="form-textarea"
               value={value}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
               placeholder={field.placeholder}
@@ -177,6 +177,7 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
               {field.required && <span className="collection-form-required">*</span>}
             </label>
             <Input
+              className="form-input"
               type="number"
               value={value}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
@@ -196,6 +197,7 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
               {field.required && <span className="collection-form-required">*</span>}
             </label>
             <Input
+              className="form-input"
               value={value}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
               placeholder={field.placeholder}

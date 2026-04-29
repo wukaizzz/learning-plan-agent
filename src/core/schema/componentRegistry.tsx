@@ -6,11 +6,11 @@
  */
 
 import React from 'react';
-import type { UIBlock } from '../../types/uiBlocks';
-import { ProgressBar } from '../../components/ui-blocks/ProgressBar/ProgressBar';
-import { ToolCallStatus } from '../../components/ui-blocks/ToolCallStatus/ToolCallStatus';
-import { WorkflowIndicator } from '../../components/ui-blocks/WorkflowIndicator/WorkflowIndicator';
-import { CollectionForm } from '../../components/ui-blocks/CollectionForm';
+import type { UIBlock } from '@/types/uiBlocks';
+import { ProgressBar } from '@/components/ui-blocks/ProgressBar/ProgressBar';
+import { ToolCallStatus } from '@/components/ui-blocks/ToolCallStatus/ToolCallStatus';
+import { WorkflowIndicator } from '@/components/ui-blocks/WorkflowIndicator/WorkflowIndicator';
+import { CollectionForm } from '@/components/ui-blocks/CollectionForm';
 
 // TODO: 逐步导入各个 UI Block 组件
 // import { SummaryCard } from '../../components/ui-blocks/SummaryCard';
