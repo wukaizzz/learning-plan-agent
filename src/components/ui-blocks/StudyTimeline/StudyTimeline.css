@@ -1,0 +1,229 @@
+/**
+ * StudyTimeline 组件样式
+ */
+
+.study-timeline {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.timeline-header {
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.timeline-title {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.timeline-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.timeline-date {
+  font-weight: 500;
+}
+
+.timeline-separator {
+  opacity: 0.7;
+}
+
+.timeline-total {
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.timeline-legend {
+  display: flex;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legend-dot.event-milestone {
+  background: #f59e0b;
+}
+
+.legend-dot.event-exam {
+  background: #ef4444;
+}
+
+.legend-dot.event-study {
+  background: #3b82f6;
+}
+
+.legend-dot.event-rest {
+  background: #10b981;
+}
+
+.timeline-content {
+  padding: 20px;
+  position: relative;
+}
+
+.timeline-event {
+  display: flex;
+  gap: 16px;
+  position: relative;
+  padding-bottom: 24px;
+}
+
+.timeline-event:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-event:last-child .timeline-line {
+  display: none;
+}
+
+.timeline-event-dot {
+  position: relative;
+  z-index: 1;
+  width: 40px;
+  display: flex;
+  justify-content: center;
+}
+
+.event-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 50%;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.event-milestone .event-icon {
+  border: 2px solid #f59e0b;
+  background: #fffbeb;
+}
+
+.event-exam .event-icon {
+  border: 2px solid #ef4444;
+  background: #fef2f2;
+}
+
+.event-study .event-icon {
+  border: 2px solid #3b82f6;
+  background: #eff6ff;
+}
+
+.event-rest .event-icon {
+  border: 2px solid #10b981;
+  background: #ecfdf5;
+}
+
+.timeline-event-content {
+  flex: 1;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border-left: 3px solid transparent;
+}
+
+.event-milestone .timeline-event-content {
+  border-left-color: #f59e0b;
+}
+
+.event-exam .timeline-event-content {
+  border-left-color: #ef4444;
+}
+
+.event-study .timeline-event-content {
+  border-left-color: #3b82f6;
+}
+
+.event-rest .timeline-event-content {
+  border-left-color: #10b981;
+}
+
+.importance-high .timeline-event-content {
+  background: #fef3c7;
+}
+
+.importance-medium .timeline-event-content {
+  background: #f9fafb;
+}
+
+.importance-low .timeline-event-content {
+  background: #f9fafb;
+  opacity: 0.8;
+}
+
+.event-date {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.event-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.event-importance {
+  margin-top: 6px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  display: inline-block;
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.timeline-line {
+  position: absolute;
+  left: 20px;
+  top: 32px;
+  bottom: 0;
+  width: 2px;
+  background: #e5e7eb;
+}
+
+.timeline-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #9ca3af;
+}
+
+.empty-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.timeline-empty p {
+  margin: 0;
+  font-size: 14px;
+}

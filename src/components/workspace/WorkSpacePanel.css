@@ -170,6 +170,36 @@
   gap: 16px;
 }
 
+/* 视图切换按钮 */
+.view-switcher {
+  display: flex;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.view-switcher-btn {
+  padding: 10px 18px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-switcher-btn:hover {
+  background: #f9fafb;
+  color: #1f2937;
+}
+
+.view-switcher-btn.active {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
 .btn-test-space {
   display: flex;
   align-items: center;

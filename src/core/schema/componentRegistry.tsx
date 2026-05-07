@@ -11,14 +11,13 @@ import { ProgressBar } from '@/components/ui-blocks/ProgressBar/ProgressBar';
 import { ToolCallStatus } from '@/components/ui-blocks/ToolCallStatus/ToolCallStatus';
 import { WorkflowIndicator } from '@/components/ui-blocks/WorkflowIndicator/WorkflowIndicator';
 import { CollectionForm } from '@/components/ui-blocks/CollectionForm';
-
-// TODO: 逐步导入各个 UI Block 组件
-// import { SummaryCard } from '../../components/ui-blocks/SummaryCard';
-// import { DailyTaskList } from '../../components/ui-blocks/DailyTaskList';
-// import { StudyTimeline } from '../../components/ui-blocks/StudyTimeline';
-// import { RiskAlert } from '../../components/ui-blocks/RiskAlert';
-// import { ActionBar } from '../../components/ui-blocks/ActionBar';
-// import { GeneratingSkeleton } from '../../components/ui-blocks/GeneratingSkeleton';
+// ✅ 新导入的 UI Block 组件
+import { SummaryCard } from '@/components/ui-blocks/SummaryCard/SummaryCard';
+import { DailyTaskList } from '@/components/ui-blocks/DailyTaskList/DailyTaskList';
+import { StudyTimeline } from '@/components/ui-blocks/StudyTimeline/StudyTimeline';
+import { RiskAlert } from '@/components/ui-blocks/RiskAlert/RiskAlert';
+import { ActionBar } from '@/components/ui-blocks/ActionBar/ActionBar';
+import { GeneratingSkeleton } from '@/components/ui-blocks/GeneratingSkeleton/GeneratingSkeleton';
 
 /**
  * 临时占位组件 - 用于尚未实现的 Block 类型
@@ -56,15 +55,15 @@ const PlaceholderBlock: React.FC<{ block: UIBlock }> = ({ block }) => (
  * TODO: 在实现完各个组件后，取消对应的注释并替换 PlaceholderBlock
  */
 const BLOCK_REGISTRY: Record<string, React.ComponentType<any>> = {
-  'summary-card': PlaceholderBlock, // SummaryCard
-  'daily-task-list': PlaceholderBlock, // DailyTaskList
-  'study-timeline': PlaceholderBlock, // StudyTimeline
+  'summary-card': SummaryCard, // ✅ 已实现
+  'daily-task-list': DailyTaskList, // ✅ 已实现
+  'study-timeline': StudyTimeline, // ✅ 已实现
   'progress-bar': ProgressBar, // ✅ 已实现
-  'risk-alert': PlaceholderBlock, // RiskAlert
-  'action-bar': PlaceholderBlock, // ActionBar
+  'risk-alert': RiskAlert, // ✅ 已实现
+  'action-bar': ActionBar, // ✅ 已实现
   'tool-call-status': ToolCallStatus, // ✅ 已实现
   'collection-form': CollectionForm, // ✅ 已实现
-  'generating-skeleton': PlaceholderBlock, // GeneratingSkeleton
+  'generating-skeleton': GeneratingSkeleton, // ✅ 已实现
   'workflow-indicator': WorkflowIndicator // ✅ 已实现
 };
 

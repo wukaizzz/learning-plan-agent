@@ -1,9 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { ChatStore, Message, ChatSession, WorkspaceState } from '../types/chat';
-import type { UIBlock } from '../types/uiBlocks';
-
+import type { ChatStore, Message, ChatSession, WorkspaceState, UIBlock } from '@/types'
 const generateId = () => `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
 export const useChatStore = create<ChatStore>()(
