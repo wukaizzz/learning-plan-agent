@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-import { MessageList,MessageInput,SessionList } from '@/components/chat/message'; 
+import { MessageList,MessageInput,SessionList } from '@/components/chat/message';
 import { WorkflowSection } from './WorkflowSection';
+import { WorkflowResumePrompt } from '@/components/workflow-resume/WorkflowResumePrompt';
 import { useChat, useStream, useAgent, useWorkflow } from '@/hooks';
 import { useChatStore,useSpaceStore } from '@/store';
 import type { Message } from '@/types';
@@ -18,7 +19,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
   const { messages, isStreaming, addUserMessage } = useChat();
   const { streamResponse } = useStream();
   const { getCurrentAgentConfig } = useAgent();
-  const { currentSessionId, createNewSession, switchToSpaceSession, setCurrentSpace, workspaceState, uiBlocks } = useChatStore();
+  const {
+    currentSessionId,
+    createNewSession,
+    switchToSpaceSession,
+    setCurrentSpace,
+    workspaceState,
+    uiBlocks,
+    activeFormStep,
+    workflowInterrupted,
+    lastFormStep,
+    setActiveFormStep,
+    resetFormCollection
+  } = useChatStore();
   const { transitionToState, isWorkflowActive } = useWorkflow();
   const navigate = useNavigate();
   const { spaceId } = useParams();
@@ -26,11 +39,36 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
 
   const currentSpace = getCurrentSpace();
 
+  // 🆕 状态：是否显示恢复提示
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
+
   // 退出空间处理
   const handleExitSpace = () => {
     // 清除当前空间关联
     setCurrentSpace(null);
     navigate('/workSpace');
+  };
+
+  // 🆕 处理恢复工作流
+  const handleResumeWorkflow = () => {
+    console.log('▶️ 继续工作流，从步骤:', activeFormStep);
+    setShowResumePrompt(false);
+    // 继续显示当前的表单
+  };
+
+  // 🆕 处理重新开始工作流
+  const handleRestartWorkflow = () => {
+    console.log('🔄 重新开始工作流');
+    setShowResumePrompt(false);
+    resetFormCollection();
+    setActiveFormStep(0);
+    transitionToState('collecting');
+  };
+
+  // 🆕 关闭恢复提示
+  const handleDismissResumePrompt = () => {
+    console.log('🚫 忽略恢复提示');
+    setShowResumePrompt(false);
   };
 
   // 当进入空间时，切换到对应空间的聊天会话
@@ -50,18 +88,46 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
     }
   }, [spaceId]); // 只依赖 spaceId，避免无限循环
 
+  // 🆕 工作流恢复检测
+  useEffect(() => {
+    if (workspaceState === 'collecting' && workflowInterrupted && lastFormStep !== null) {
+      console.log('⚠️ 检测到中断的工作流，步骤:', lastFormStep);
+      setShowResumePrompt(true);
+      setActiveFormStep(lastFormStep);
+    }
+  }, [workspaceState, workflowInterrupted, lastFormStep, setActiveFormStep]);
+
+  // 🆕 组件卸载时标记工作流中断
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (workspaceState === 'collecting' && !workflowInterrupted) {
+        // 标记工作流中断
+        console.log('⚠️ 页面即将卸载，标记工作流在步骤', activeFormStep, '中断');
+        // 注意：这里不能直接调用 store 的方法，因为页面即将卸载
+        // 实际的中断标记应该在其他地方完成，比如在 submitFormStep 时
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [workspaceState, workflowInterrupted, activeFormStep]);
+
   const handleSendMessage = async (content: string) => {
     // Add user message
     const userMessage = addUserMessage(content);
-
-    // Prepare messages for API
+    //TODO 消息队列，信息压缩
+    // Prepare messages for API 
     const messagesForApi: Message[] = [
       ...messages,
       userMessage
     ];
 
     try {
-      // Stream response (default to deepseek)
+      // Stream response (default to deepseek) /api/chat
+      // 🆕 不再传递事件回调，因为 useStream 内部会自动处理
       await streamResponse(messagesForApi, 'deepseek');
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -78,6 +144,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
 
       {/* Main Chat Panel */}
       <div className="chat-panel">
+        {/* 🆕 工作流恢复提示 */}
+        {showResumePrompt && (
+          <WorkflowResumePrompt
+            stepIndex={activeFormStep}
+            totalSteps={3}
+            onResume={handleResumeWorkflow}
+            onRestart={handleRestartWorkflow}
+            onDismiss={handleDismissResumePrompt}
+          />
+        )}
+
         {/* 🆕 工作流展示区域 - 根据状态自动显示 */}
         {isWorkflowActive && (
           <WorkflowSection

@@ -7,12 +7,15 @@
  * - 渲染当前状态的 UI Blocks
  * - 支持折叠/展开
  * - 提供工作流状态控制
+ * - 🆕 支持多表单顺序收集
  */
 
-import React, { useState } from 'react';
-import { useChatStore } from '../../store/chatStore';
-import { renderBlocks } from '../../core/schema/componentRegistry.tsx';
-import type { UIBlock,WorkspaceState } from '../../types/uiBlocks';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router';
+import { useLangGraphWorkflow } from '@/hooks/useLangGraphWorkflow';
+import { useChatStore } from '@/store/chatStore';
+import { renderBlocks, type RenderContext } from '../../core/schema/componentRegistry.tsx';
+import type { UIBlock, WorkspaceState } from '../../types/uiBlocks';
 
 interface WorkflowSectionProps {
   workspaceState: WorkspaceState;
@@ -22,16 +25,112 @@ interface WorkflowSectionProps {
 
 export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   workspaceState,
-  uiBlocks,
-  onStateChange
+  uiBlocks
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
+
+  // 🆕 获取 chatStore 用于多表单管理
+  const {
+    activeFormStep,
+    formStepsData,
+    setActiveFormStep,
+    submitFormStep,
+    markWorkflowInterrupted
+  } = useChatStore();
+
+  // 获取路由参数和工作流 hooks
+  const { spaceId } = useParams();
+  const { resume, isLoading, error } = useLangGraphWorkflow();
+
+  // 🆕 获取 collection-form blocks
+  const collectionForms = uiBlocks.filter(block => block.type === 'collection-form');
+  const totalFormSteps = collectionForms.length;
+
+  /**
+   * 处理表单提交
+   * 🆕 支持多表单顺序提交
+   */
+  const handleFormSubmit = async (formData: Record<string, unknown>) => {
+    console.log('📝 表单提交数据:', formData);
+
+    // 🆕 保存当前步骤的表单数据
+    submitFormStep(activeFormStep, formData);
+
+    // 🆕 检查是否还有下一个表单
+    if (activeFormStep < totalFormSteps - 1) {
+      // 切换到下一个表单
+      setActiveFormStep(activeFormStep + 1);
+      console.log(`✅ 表单步骤 ${activeFormStep} 完成，切换到步骤 ${activeFormStep + 1}`);
+      return;
+    }
+
+    // 🆕 所有表单都已完成，提交到后端
+    if (!spaceId) {
+      console.error('❌ 缺少 spaceId');
+      alert('无法提交：缺少学习空间标识');
+      return;
+    }
+
+    try {
+      // 🆕 合并所有表单数据
+      const allFormData = Object.values(formStepsData).reduce((acc, data) => ({
+        ...acc,
+        ...data
+      }), formData);
+
+      console.log('📝 提交所有表单数据:', allFormData);
+
+      const response = await resume(spaceId, allFormData as Record<string, string | number>);
+
+      if (response.success) {
+        console.log('✅ 所有表单提交成功，工作流已恢复');
+        // 🆕 后续的工作流事件将自动附加到当前消息，由 useStream 处理
+      } else if (response.error) {
+        console.error('❌ 表单提交失败:', response.error);
+        alert(`提交失败: ${response.error}`);
+      }
+    } catch (err) {
+      console.error('❌ 表单提交异常:', err);
+      alert('提交失败，请稍后重试');
+    }
+  };
+
+  /**
+   * 创建渲染上下文
+   * 🆕 传递表单步骤信息到 collection-form
+   */
+  const renderContext: RenderContext = {
+    threadId: spaceId,
+    onSubmit: handleFormSubmit,
+    isLoading,
+    error,
+    stepIndex: activeFormStep,
+    totalSteps: totalFormSteps,
+    showProgress: totalFormSteps > 1
+  };
 
   // workspaceState 为 'empty' 时不显示
   if (workspaceState === 'empty' || uiBlocks.length === 0) {
     return null;
   }
+
+  // 🆕 过滤 UI Blocks：只显示当前步骤的表单和其他非表单 blocks
+  const currentFormBlock = collectionForms[activeFormStep];
+  const nonFormBlocks = uiBlocks.filter(block => block.type !== 'collection-form');
+  const currentUIBlocks = currentFormBlock
+    ? [...nonFormBlocks, currentFormBlock]
+    : nonFormBlocks;
+
+  // 🆕 组件卸载时标记工作流中断
+  useEffect(() => {
+    return () => {
+      if (workspaceState === 'collecting' && activeFormStep < totalFormSteps) {
+        console.log('⚠️ 工作流卸载，标记在步骤', activeFormStep, '中断');
+        markWorkflowInterrupted(activeFormStep);
+      }
+    };
+  }, [workspaceState, activeFormStep, totalFormSteps, markWorkflowInterrupted]);
 
   const handleToggleExpand = () => {
     setIsExpanded(!isExpanded);
@@ -78,17 +177,17 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
         <div className="workflow-section-content">
           {/* UI Blocks 渲染区域 */}
           <div className="workflow-blocks-container">
-            {renderBlocks(uiBlocks)}
+            {renderBlocks(currentUIBlocks, renderContext)}
           </div>
 
           {/* 工作流信息 */}
-          {uiBlocks.length > 0 && (
+          {currentUIBlocks.length > 0 && (
             <div className="workflow-section-info">
               <span className="workflow-blocks-count">
-                {uiBlocks.length} 个 UI 组件
+                {currentUIBlocks.length} 个 UI 组件
               </span>
               <span className="workflow-state-description">
-                {getStateDescription(workspaceState)}
+                {getStateDescription(workspaceState, totalFormSteps, activeFormStep)}
               </span>
             </div>
           )}
@@ -100,11 +199,18 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
 
 /**
  * 获取工作流状态的描述文本
+ * 🆕 添加表单步骤信息
  */
-function getStateDescription(state: WorkspaceState): string {
-  const descriptions: Record<WorkspaceState, string> = {
+function getStateDescription(
+  state: WorkspaceState,
+  totalFormSteps: number = 0,
+  currentStep: number = 0
+): string {
+  const baseDescriptions: Record<WorkspaceState, string> = {
     'empty': '等待开始',
-    'collecting': '正在收集学习信息...',
+    'collecting': totalFormSteps > 1
+      ? `正在收集学习信息 (${currentStep + 1}/${totalFormSteps})`
+      : '正在收集学习信息...',
     'analyzing': '正在分析数据...',
     'generating': '正在生成学习计划...',
     'reviewing': '请查看并确认生成的计划',
@@ -112,5 +218,5 @@ function getStateDescription(state: WorkspaceState): string {
     'paused': '计划已暂停'
   };
 
-  return descriptions[state] || '处理中...';
+  return baseDescriptions[state] || '处理中...';
 }

@@ -137,21 +137,21 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   useEffect(() => {
     // Focus textarea on mount
     textareaRef.current?.focus();
-    let lastKeyTime = 0;
-    function handleKeyDown(e:any) {
-      const input = textareaRef.current;
-      if(document.activeElement === input) {
-        return;
-      }
-      const now = Date.now();
-      if(now - lastKeyTime < 300){
-        input?.focus();
-        input?.dispatchEvent(new KeyboardEvent('keydown', { key: e.key }));
-      }
-      lastKeyTime = now;
-    }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    // let lastKeyTime = 0;
+    // function handleKeyDown(e:any) {
+    //   const input = textareaRef.current;
+    //   if(document.activeElement === input) {
+    //     return;
+    //   }
+    //   const now = Date.now();
+    //   if(now - lastKeyTime < 300){
+    //     input?.focus();
+    //     input?.dispatchEvent(new KeyboardEvent('keydown', { key: e.key }));
+    //   }
+    //   lastKeyTime = now;
+    // }
+    // window.addEventListener('keydown', handleKeyDown);
+    // return () => window.removeEventListener('keydown', handleKeyDown)
   }, []);
 
   return (

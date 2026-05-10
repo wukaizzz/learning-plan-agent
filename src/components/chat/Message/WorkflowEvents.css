@@ -1,0 +1,320 @@
+/* WorkflowEvents 组件样式 */
+
+.workflow-events {
+  background: rgba(102, 126, 234, 0.05);
+  border-left: 3px solid #667eea;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.workflow-events.collapsed {
+  max-height: 48px;
+}
+
+.workflow-events.expanded {
+  max-height: none;
+}
+
+.workflow-events-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(102, 126, 234, 0.03);
+  transition: background 0.2s ease;
+}
+
+.workflow-events-header:hover {
+  background: rgba(102, 126, 234, 0.08);
+}
+
+.workflow-events-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.workflow-events-icon {
+  font-size: 16px;
+}
+
+.workflow-events-count {
+  font-size: 12px;
+  color: #9ca3af;
+  background: rgba(156, 163, 175, 0.2);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.workflow-events-toggle {
+  font-size: 12px;
+  color: #9ca3af;
+  transition: transform 0.2s ease;
+}
+
+.workflow-events-toggle.open {
+  transform: rotate(180deg);
+}
+
+.workflow-events-content {
+  padding: 12px 16px;
+}
+
+.workflow-event-item {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.workflow-event-item:hover {
+  border-color: #667eea;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+}
+
+.workflow-event-item:last-child {
+  margin-bottom: 0;
+}
+
+.workflow-event-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: #f9fafb;
+}
+
+.workflow-event-icon {
+  font-size: 14px;
+}
+
+.workflow-event-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.workflow-event-toggle {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.workflow-event-details {
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.workflow-event-message {
+  color: #4b5563;
+  margin-bottom: 8px;
+}
+
+.workflow-event-message.error {
+  color: #dc2626;
+}
+
+.workflow-event-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.workflow-event-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.workflow-event-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  transition: width 0.3s ease;
+}
+
+.workflow-event-progress-text {
+  font-size: 12px;
+  color: #9ca3af;
+  min-width: 35px;
+  text-align: right;
+}
+
+.workflow-event-status,
+.workflow-event-stage {
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.workflow-event-params,
+.workflow-event-result-value {
+  background: #1f2937;
+  color: #e5e7eb;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.workflow-event-result {
+  margin-top: 8px;
+}
+
+.workflow-event-result-label,
+.workflow-event-field-label,
+.workflow-event-findings-label,
+.workflow-event-recommendations-label,
+.workflow-event-options-label,
+.workflow-event-error-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin: 8px 0 4px;
+}
+
+.workflow-event-findings ul,
+.workflow-event-recommendations ul,
+.workflow-event-options ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.workflow-event-findings li,
+.workflow-event-recommendations li,
+.workflow-event-options li {
+  color: #4b5563;
+  margin: 4px 0;
+}
+
+.workflow-event-summary {
+  color: #374151;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.workflow-event-question {
+  color: #374151;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.workflow-event-details-text {
+  color: #6b7280;
+  margin: 4px 0;
+}
+
+.workflow-event-field {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.workflow-event-field-name,
+.workflow-event-field-type {
+  color: #6b7280;
+}
+
+.workflow-event-error {
+  margin-top: 8px;
+  border-left: 3px solid #ef4444;
+  padding-left: 8px;
+}
+
+.workflow-event-error-message {
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.workflow-events-streaming {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  justify-content: center;
+}
+
+.streaming-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #667eea;
+  animation: pulse 1.4s infinite ease-in-out both;
+}
+
+.streaming-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.streaming-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes pulse {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 事件类型特定样式 */
+.workflow-event-item.workflow_step {
+  border-left-color: #667eea;
+}
+
+.workflow-event-item.tool_call {
+  border-left-color: #8b5cf6;
+}
+
+.workflow-event-item.processing {
+  border-left-color: #9ca3af;
+}
+
+.workflow-event-item.analysis_result {
+  border-left-color: #22c55e;
+}
+
+.workflow-event-item.info_needed {
+  border-left-color: #f59e0b;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .workflow-events-header {
+    padding: 10px 12px;
+  }
+
+  .workflow-events-title {
+    font-size: 13px;
+  }
+
+  .workflow-event-header {
+    padding: 6px 10px;
+  }
+
+  .workflow-event-details {
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  .workflow-event-params,
+  .workflow-event-result-value {
+    font-size: 11px;
+  }
+}

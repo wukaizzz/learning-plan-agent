@@ -147,8 +147,11 @@ export const CollectionFormPropsSchema = z.object({
     placeholder: z.string().optional(),
     required: z.boolean().optional(),
     options: z.array(z.string()).optional(),
-    validation: z.function().optional() // 函数类型特殊处理
-  }))
+    validation: z.function().optional()
+  })),
+  stepIndex: z.number().optional(),
+  totalSteps: z.number().optional(),
+  showProgress: z.boolean().optional()
 });
 
 /**
@@ -459,6 +462,9 @@ export interface CollectionFormProps {
     options?: string[];
     validation?: (value: any) => boolean;
   }>;
+  stepIndex?: number;
+  totalSteps?: number;
+  showProgress?: boolean;
 }
 
 /**

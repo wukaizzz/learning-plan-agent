@@ -1,0 +1,190 @@
+/**
+ * WorkflowResumePrompt Component Styles
+ * 工作流恢复提示组件样式
+ */
+
+.workflow-resume-prompt {
+  background: linear-gradient(135deg, #fff7ed 0%, #fffbeb 100%);
+  border: 1px solid #fbbf24;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.15);
+  animation: slideDown 0.3s ease;
+}
+
+.workflow-resume-prompt-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.workflow-resume-prompt-icon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  background: #fef3c7;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d97706;
+  animation: pulse 2s infinite;
+}
+
+.workflow-resume-prompt-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.workflow-resume-prompt-title {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.workflow-resume-prompt-description {
+  margin: 0;
+  font-size: 14px;
+  color: #b45309;
+  line-height: 1.5;
+}
+
+.workflow-resume-prompt-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.workflow-resume-prompt-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  white-space: nowrap;
+}
+
+.workflow-resume-prompt-button-primary {
+  background: #f59e0b;
+  color: white;
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+}
+
+.workflow-resume-prompt-button-primary:hover {
+  background: #d97706;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(245, 158, 11, 0.3);
+}
+
+.workflow-resume-prompt-button-primary:active {
+  transform: translateY(0);
+}
+
+.workflow-resume-prompt-button-secondary {
+  background: white;
+  color: #78716c;
+  border: 1px solid #d6d3d1;
+}
+
+.workflow-resume-prompt-button-secondary:hover {
+  background: #fafaf9;
+  border-color: #a8a29e;
+  color: #44403c;
+}
+
+.workflow-resume-prompt-button-secondary:active {
+  background: #f5f5f4;
+}
+
+.workflow-resume-prompt-button-dismiss {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  color: #a8a29e;
+  font-size: 18px;
+  border: 1px solid transparent;
+  justify-content: center;
+}
+
+.workflow-resume-prompt-button-dismiss:hover {
+  background: rgba(168, 162, 158, 0.1);
+  color: #78716c;
+  border-color: #d6d3d1;
+}
+
+/* 动画效果 */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .workflow-resume-prompt {
+    padding: 16px;
+    margin: 12px 0;
+  }
+
+  .workflow-resume-prompt-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .workflow-resume-prompt-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .workflow-resume-prompt-actions {
+    flex-wrap: wrap;
+  }
+
+  .workflow-resume-prompt-button {
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .workflow-resume-prompt-button-dismiss {
+    flex: 0 0 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .workflow-resume-prompt-title {
+    font-size: 14px;
+  }
+
+  .workflow-resume-prompt-description {
+    font-size: 13px;
+  }
+
+  .workflow-resume-prompt-button {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}

@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useChatStore } from '../store/chatStore';
 import type { Message, ToolCall } from '../types/chat';
+import type { WorkflowEvent } from '../types/workflowEvents';
 
 export function useChat() {
   const {
@@ -12,7 +13,10 @@ export function useChat() {
     setCurrentAgent,
     setStreaming,
     updateToolCall,
-    updateLastAssistantMessage
+    updateLastAssistantMessage,
+    setCurrentWorkflowEvents, // 🆕
+    addWorkflowEvent, // 🆕
+    updateMessageWorkflowEvents // 🆕
   } = useChatStore();
 
   const addUserMessage = useCallback((content: string) => {
@@ -32,16 +36,29 @@ export function useChat() {
       role: 'assistant',
       content,
       timestamp: Date.now(),
-      tool_calls: toolCalls
+      tool_calls: toolCalls,
+      workflow_events: [] // 🆕 初始化空事件数组
     };
     addMessage(message);
-    return message;
-  }, [addMessage]);
 
-  const updateAssistantMessage = useCallback((messageId: string, content: string) => {
-    // This would be implemented if we needed to update existing messages
-    // For now, we just append new content
-  }, []);
+    // 🆕 重置当前工作流事件
+    setCurrentWorkflowEvents([]);
+
+    return message;
+  }, [addMessage, setCurrentWorkflowEvents]);
+
+  // 🆕 添加工作流事件到当前消息
+  const appendWorkflowEvent = useCallback((event: WorkflowEvent) => {
+    addWorkflowEvent(event);
+
+    // 🆕 实时更新最后一条消息的事件
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant') {
+        updateMessageWorkflowEvents(lastMessage.id, [...(lastMessage.workflow_events || []), event]);
+      }
+    }
+  }, [addWorkflowEvent, messages, updateMessageWorkflowEvents]);
 
   return {
     messages,
@@ -53,6 +70,7 @@ export function useChat() {
     setCurrentAgent,
     setStreaming,
     updateToolCall,
-    updateLastAssistantMessage
+    updateLastAssistantMessage,
+    appendWorkflowEvent // 🆕 导出
   };
 }

@@ -55,7 +55,7 @@ const WORKFLOW_BLOCK_MAPPING: Record<
 
   /**
    * collecting - 正在收集信息
-   * 显示信息收集表单和当前进度
+   * 🆕 显示多步骤表单收集
    */
   collecting: () => [
     createBlock('tool-call-status', '信息收集中', {
@@ -78,21 +78,84 @@ const WORKFLOW_BLOCK_MAPPING: Record<
         }
       ]
     }),
-    createBlock('collection-form', '补充信息', {
-      stage: 'details',
+    // 🆕 表单步骤1：学习目标
+    createBlock('collection-form', '学习目标', {
+      stage: 'initial',
+      stepIndex: 0,
+      totalSteps: 3,
+      showProgress: true,
       fields: [
         {
-          name: 'studyTime',
+          name: 'goal',
+          label: '学习目标',
+          type: 'textarea',
+          placeholder: '例如：准备期末考试达到85分以上',
+          required: true
+        },
+        {
+          name: 'examDate',
+          label: '考试日期',
+          type: 'date',
+          required: true
+        }
+      ]
+    }),
+    // 🆕 表单步骤2：科目信息
+    createBlock('collection-form', '科目信息', {
+      stage: 'details',
+      stepIndex: 1,
+      totalSteps: 3,
+      showProgress: true,
+      fields: [
+        {
+          name: 'subjects',
+          label: '学习科目',
+          type: 'select',
+          options: ['高等数学', '大学英语', 'C语言程序设计', '数据结构', '计算机网络'],
+          required: true
+        },
+        {
+          name: 'currentScore',
+          label: '当前成绩',
+          type: 'number',
+          placeholder: '例如：65',
+          required: true
+        },
+        {
+          name: 'weakPoints',
+          label: '薄弱知识点',
+          type: 'textarea',
+          placeholder: '例如：微积分、概率论',
+          required: false
+        }
+      ]
+    }),
+    // 🆕 表单步骤3：时间安排
+    createBlock('collection-form', '时间安排', {
+      stage: 'confirmation',
+      stepIndex: 2,
+      totalSteps: 3,
+      showProgress: true,
+      fields: [
+        {
+          name: 'dailyHours',
           label: '每日学习时间（小时）',
           type: 'number',
           placeholder: '例如：4',
           required: true
         },
         {
-          name: 'weakSubjects',
-          label: '薄弱科目',
+          name: 'preferredTime',
+          label: '偏好学习时段',
           type: 'select',
-          options: ['高等数学', '大学英语', 'C语言程序设计'],
+          options: ['上午', '下午', '晚上', '周末'],
+          required: false
+        },
+        {
+          name: 'unavailableDates',
+          label: '不可用日期（如有）',
+          type: 'textarea',
+          placeholder: '例如：5月1日-5月3日',
           required: false
         }
       ]

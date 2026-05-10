@@ -24,19 +24,33 @@ interface CollectionFormProps {
   onCancel?: () => void;
   title?: string;
   description?: string;
+  isLoading?: boolean;
+  externalError?: string | null;
+  stepIndex?: number;
+  totalSteps?: number;
+  showProgress?: boolean;
 }
 
 export const CollectionForm: React.FC<CollectionFormProps> = ({
-  stage = 'initial',
+  stage,
   fields,
   onSubmit,
   onCancel,
   title = '补充信息',
-  description = '请完善以下信息以继续'
+  description = '请完善以下信息以继续',
+  isLoading = false,
+  externalError = null,
+  stepIndex = 0,
+  totalSteps = 1,
+  showProgress = false
 }) => {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false); // 🆕 提交状态
+
+  // 检查是否处于加载状态（内部或外部）
+  const isFormDisabled = isSubmitting || isLoading;
 
   // 初始化表单数据
   useEffect(() => {
@@ -106,10 +120,10 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
     setIsSubmitting(true);
     try {
       await onSubmit(formData);
+      setIsSubmitted(true); // 🆕 标记为已提交
     } catch (error) {
       console.error('表单提交失败:', error);
-    } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false); // 失败时不隐藏表单
     }
   };
 
@@ -209,14 +223,53 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
     }
   };
 
+  // 🆕 如果已提交，不显示表单（表单会自动消失）
+  if (isSubmitted) {
+    return null;
+  }
+
+  // 🆕 步骤进度显示
+  const showStepProgress = showProgress && totalSteps > 1 && stage !== 'initial';
+
   return (
     <div className="collection-form-container">
       <div className="collection-form-header">
-        <h3 className="collection-form-title">{title}</h3>
+        <div className="collection-form-header-title">
+          <h3 className="collection-form-title">{title}</h3>
+          {showStepProgress && (
+            <div className="collection-form-progress">
+              <span className="collection-form-progress-current">{stepIndex + 1}</span>
+              <span className="collection-form-progress-divider">/</span>
+              <span className="collection-form-progress-total">{totalSteps}</span>
+            </div>
+          )}
+        </div>
         {description && <p className="collection-form-description">{description}</p>}
       </div>
 
-      <form onSubmit={handleSubmit} className="collection-form">
+      {/* 外部错误显示 */}
+      {externalError && (
+        <div className="collection-form-external-error">
+          ⚠️ {externalError}
+        </div>
+      )}
+
+      {/* 🆕 步骤进度条 */}
+      {showStepProgress && (
+        <div className="collection-form-progress-bar-container">
+          <div className="collection-form-progress-bar">
+            <div
+              className="collection-form-progress-bar-fill"
+              style={{ width: `${((stepIndex + 1) / totalSteps) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      <form
+        onSubmit={handleSubmit}
+        className={`collection-form ${isFormDisabled ? 'form-disabled' : ''}`}
+      >
         <div className="collection-form-fields">
           {fields.map(renderField)}
         </div>
@@ -227,7 +280,7 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
               type="button"
               onClick={onCancel}
               className="collection-form-button collection-form-button-secondary"
-              disabled={isSubmitting}
+              disabled={isFormDisabled}
             >
               取消
             </button>
@@ -235,9 +288,9 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
           <button
             type="submit"
             className="collection-form-button collection-form-button-primary"
-            disabled={isSubmitting}
+            disabled={isFormDisabled}
           >
-            {isSubmitting ? '提交中...' : '提交'}
+            {isFormDisabled ? '提交中...' : '提交'}
           </button>
         </div>
       </form>

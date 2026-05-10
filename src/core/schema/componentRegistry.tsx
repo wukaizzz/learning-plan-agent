@@ -10,7 +10,7 @@ import type { UIBlock } from '@/types/uiBlocks';
 import { ProgressBar } from '@/components/ui-blocks/ProgressBar/ProgressBar';
 import { ToolCallStatus } from '@/components/ui-blocks/ToolCallStatus/ToolCallStatus';
 import { WorkflowIndicator } from '@/components/ui-blocks/WorkflowIndicator/WorkflowIndicator';
-import { CollectionForm } from '@/components/ui-blocks/CollectionForm';
+import { CollectionForm, type FormField } from '@/components/ui-blocks/CollectionForm';
 // ✅ 新导入的 UI Block 组件
 import { SummaryCard } from '@/components/ui-blocks/SummaryCard/SummaryCard';
 import { DailyTaskList } from '@/components/ui-blocks/DailyTaskList/DailyTaskList';
@@ -18,6 +18,20 @@ import { StudyTimeline } from '@/components/ui-blocks/StudyTimeline/StudyTimelin
 import { RiskAlert } from '@/components/ui-blocks/RiskAlert/RiskAlert';
 import { ActionBar } from '@/components/ui-blocks/ActionBar/ActionBar';
 import { GeneratingSkeleton } from '@/components/ui-blocks/GeneratingSkeleton/GeneratingSkeleton';
+
+/**
+ * 渲染上下文接口
+ * 用于传递工作流相关的上下文信息
+ */
+export interface RenderContext {
+  threadId?: string;
+  onSubmit?: (data: Record<string, unknown>) => Promise<void>;
+  isLoading?: boolean;
+  error?: string | null;
+  stepIndex?: number;
+  totalSteps?: number;
+  showProgress?: boolean;
+}
 
 /**
  * 临时占位组件 - 用于尚未实现的 Block 类型
@@ -49,6 +63,19 @@ const PlaceholderBlock: React.FC<{ block: UIBlock }> = ({ block }) => (
 );
 
 /**
+ * 字段名展平函数
+ * 将嵌套字段名（如 'goal.examDate'）展平为简单字段名（如 'examDate'）
+ * 保留原始路径用于映射回后端
+ */
+const flattenFieldNames = (fields: FormField[]): FormField[] => {
+  return fields.map(field => ({
+    ...field,
+    name: field.name.split('.').pop() || field.name, // 'goal.examDate' → 'examDate'
+    originalPath: field.name // 保留原始路径
+  }));
+};
+
+/**
  * Block 组件注册表
  * 将每个 BlockType 映射到对应的 React 组件
  *
@@ -71,6 +98,7 @@ const BLOCK_REGISTRY: Record<string, React.ComponentType<any>> = {
  * 渲染单个 UI Block
  *
  * @param block - 要渲染的 UIBlock 对象
+ * @param context - 渲染上下文（可选）
  * @returns 渲染后的 React 元素
  *
  * @example
@@ -81,9 +109,12 @@ const BLOCK_REGISTRY: Record<string, React.ComponentType<any>> = {
  *   props: { spaceName: '高等数学', ... }
  * };
  *
- * return renderBlock(block);
+ * return renderBlock(block, { threadId: 'space123', onSubmit: handle });
  */
-export const renderBlock = (block: UIBlock): React.ReactElement => {
+export const renderBlock = (
+  block: UIBlock,
+  context?: RenderContext
+): React.ReactElement => {
   const Component = BLOCK_REGISTRY[block.type];
 
   if (!Component) {
@@ -91,6 +122,25 @@ export const renderBlock = (block: UIBlock): React.ReactElement => {
     return React.createElement(PlaceholderBlock, { block });
   }
 
+  // 特殊处理 collection-form - 传递上下文信息
+  if (block.type === 'collection-form' && context?.onSubmit) {
+    const flattenedFields = flattenFieldNames(block.props.fields || []);
+
+    return React.createElement(CollectionForm, {
+      ...block.props,
+      fields: flattenedFields,
+      title: block.title,
+      key: block.id,
+      onSubmit: context.onSubmit,
+      isLoading: context.isLoading,
+      externalError: context.error,
+      stepIndex: context.stepIndex ?? block.props.stepIndex ?? 0,
+      totalSteps: context.totalSteps ?? block.props.totalSteps ?? 1,
+      showProgress: context.showProgress ?? block.props.showProgress ?? false
+    });
+  }
+
+  // 其他组件正常渲染
   return React.createElement(Component, {
     ...block.props,
     title: block.title,
@@ -103,14 +153,19 @@ export const renderBlock = (block: UIBlock): React.ReactElement => {
  * 渲染多个 UI Blocks
  *
  * @param blocks - UIBlock 数组
+ * @param context - 渲染上下文（可选）
  * @returns React 元素数组
  *
  * @example
  * const blocks = [block1, block2, block3];
- * return <div>{renderBlocks(blocks)}</div>;
+ * const context = { threadId: 'space123', onSubmit: handle };
+ * return <div>{renderBlocks(blocks, context)}</div>;
  */
-export const renderBlocks = (blocks: UIBlock[]): React.ReactElement[] => {
-  return blocks.map(block => renderBlock(block));
+export const renderBlocks = (
+  blocks: UIBlock[],
+  context?: RenderContext
+): React.ReactElement[] => {
+  return blocks.map(block => renderBlock(block, context));
 };
 
 /**

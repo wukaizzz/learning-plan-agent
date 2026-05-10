@@ -1,25 +1,217 @@
 .collection-form-container {
   background: white;
-  border-radius: 0.5rem;
-  padding: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .collection-form-header {
+  margin-bottom: 24px;
+}
+
+.collection-form-title {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.collection-form-description {
+  margin: 0;
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.collection-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 外部错误提示 */
+.collection-form-external-error {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 12px;
+  color: #dc2626;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 禁用状态 */
+.collection-form.form-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.collection-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.collection-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collection-form-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.collection-form-required {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.collection-form-error {
+  color: #ef4444;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.collection-form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.collection-form-button {
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.collection-form-button-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.collection-form-button-primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.collection-form-button-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.collection-form-button-secondary {
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.collection-form-button-secondary:hover:not(:disabled) {
+  background: #f9fafb;
+}
+
+.collection-form-button-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+.collection-form-header {
   margin-bottom: 1.5rem;
+}
+
+.collection-form-header-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .collection-form-title {
   font-size: 1.125rem;
   font-weight: 600;
   color: #1f2937;
-  margin: 0 0 0.5rem 0;
+  margin: 0;
+  flex: 1;
+}
+
+/* 步骤进度显示 */
+.collection-form-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #3b82f6;
+  background: #eff6ff;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+}
+
+.collection-form-progress-current {
+  color: #2563eb;
+}
+
+.collection-form-progress-divider {
+  color: #93c5fd;
+}
+
+.collection-form-progress-total {
+  color: #60a5fa;
+}
+
+/* 进度条容器 */
+.collection-form-progress-bar-container {
+  margin-bottom: 1.5rem;
+}
+
+.collection-form-progress-bar {
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.collection-form-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+  transition: width 0.3s ease;
 }
 
 .collection-form-description {
   font-size: 0.875rem;
   color: #6b7280;
-  margin: 0;
+  margin: 0.5rem 0 0 0;
 }
 
 .collection-form {
@@ -114,6 +306,41 @@
   font-size: 14px;
   transition: all 0.2s ease;
   box-sizing: border-box;
+}
+
+/* 🆕 表单容器动画 */
+.collection-form-container {
+  animation: formSlideIn 0.3s ease;
+}
+
+@keyframes formSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 🆕 表单消失动画 */
+.collection-form-container.form-exit {
+  animation: formSlideOut 0.3s ease forwards;
+}
+
+@keyframes formSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+    height: 0;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 .form-input:focus,

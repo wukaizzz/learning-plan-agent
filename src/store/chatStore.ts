@@ -15,8 +15,18 @@ export const useChatStore = create<ChatStore>()(
       workspaceState: 'empty' as WorkspaceState, //  工作流状态
       uiBlocks: [], //  当前显示的UI Blocks
       sessions: [],
+      activeFormStep: 0, // 🆕 当前激活的表单步骤
+      formStepsData: {}, // 🆕 已提交的表单数据
+      workflowInterrupted: false, // 🆕 工作流是否中断
+      lastFormStep: null, // 🆕 中断时的表单步骤
+      currentWorkflowEvents: [], // 🆕 当前消息的工作流事件
 
       addMessage: (message: Message) => set((state) => {
+        // 🆕 如果是 assistant 消息且有当前工作流事件，附加到消息
+        if (message.role === 'assistant' && state.currentWorkflowEvents.length > 0 && !message.workflow_events) {
+          message.workflow_events = [...state.currentWorkflowEvents];
+        }
+
         state.messages.push(message);
 
         // Update current session
@@ -305,7 +315,63 @@ export const useChatStore = create<ChatStore>()(
         const state = get();
         const session = state.sessions.find(s => s.id === sessionId);
         return session?.scrollPosition || 0;
-      }
+      },
+
+      // 🆕 Multi-form collection management
+      setActiveFormStep: (step: number) => set((state) => {
+        state.activeFormStep = step;
+      }),
+
+      submitFormStep: (stepIndex: number, data: Record<string, any>) => set((state) => {
+        state.formStepsData[stepIndex] = data;
+        console.log(`✅ 表单步骤 ${stepIndex} 提交成功:`, data);
+      }),
+
+      markWorkflowInterrupted: (step: number) => set((state) => {
+        state.workflowInterrupted = true;
+        state.lastFormStep = step;
+        console.log(`⚠️ 工作流在步骤 ${step} 中断`);
+      }),
+
+      resetFormCollection: () => set((state) => {
+        state.activeFormStep = 0;
+        state.formStepsData = {};
+        state.workflowInterrupted = false;
+        state.lastFormStep = null;
+        console.log('🔄 表单收集状态已重置');
+      }),
+
+      isFormCollectionComplete: () => {
+        const state = get();
+        const collectionForms = state.uiBlocks.filter(b => b.type === 'collection-form');
+        const totalSteps = collectionForms.length;
+        const completedSteps = Object.keys(state.formStepsData).length;
+        return completedSteps >= totalSteps;
+      },
+
+      // 🆕 Workflow events management for current message
+      setCurrentWorkflowEvents: (events) => set((state) => {
+        state.currentWorkflowEvents = events;
+      }),
+
+      addWorkflowEvent: (event) => set((state) => {
+        state.currentWorkflowEvents.push(event);
+      }),
+
+      updateMessageWorkflowEvents: (messageId, events) => set((state) => {
+        const message = state.messages.find(msg => msg.id === messageId);
+        if (message) {
+          message.workflow_events = events;
+        }
+
+        // Update in sessions
+        state.sessions.forEach(session => {
+          const message = session.messages.find(msg => msg.id === messageId);
+          if (message) {
+            message.workflow_events = events;
+          }
+        });
+      })
     })),
     {
       name: 'chat-storage',
@@ -314,7 +380,12 @@ export const useChatStore = create<ChatStore>()(
         currentAgentId: state.currentAgentId,
         currentSessionId: state.currentSessionId,
         currentSpaceId: state.currentSpaceId,
-        sessions: state.sessions
+        sessions: state.sessions,
+        activeFormStep: state.activeFormStep,
+        formStepsData: state.formStepsData,
+        workflowInterrupted: state.workflowInterrupted,
+        lastFormStep: state.lastFormStep
+        // ❌ 不需要持久化 currentWorkflowEvents，因为它只用于当前消息构建
       })
     }
   )

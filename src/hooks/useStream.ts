@@ -8,13 +8,15 @@ import type { Message } from '../types/chat';
 import type { WorkflowStepEvent, InfoNeededEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, UIBlockUpdateEvent } from '../types/workflowEvents';
 
 export function useStream() {
-  const { addAssistantMessage, setStreaming, updateToolCall, updateLastAssistantMessage } = useChat();
+  const { addAssistantMessage, setStreaming, 
+  updateToolCall, updateLastAssistantMessage, appendWorkflowEvent } = useChat();
   const { getCurrentAgentConfig } = useAgent();
   const { transitionToState } = useWorkflow();
   const { addUIBlock } = useChatStore();
   const currentMessageRef = useRef<string>('');
   const currentToolCallsRef = useRef<any[]>([]);
   const hasStartedStreaming = useRef<boolean>(false);
+  const currentMessageIdRef = useRef<string | null>(null); // 🆕 跟踪当前消息ID
 
   // 工作流事件处理函数
   const handleWorkflowStep = useCallback((event: WorkflowStepEvent) => {
@@ -118,6 +120,7 @@ export function useStream() {
     }
   }, [addUIBlock]);
 
+  // TODO 对话处理核心函数
   const streamResponse = useCallback(async (
     messages: Message[],
     apiProvider: 'deepseek' | 'doubao' = 'deepseek'
@@ -131,7 +134,7 @@ export function useStream() {
     currentToolCallsRef.current = [];
     hasStartedStreaming.current = false;
     setStreaming(true);
-
+    
     try {
       const endpoint = apiProvider === 'doubao' ? '/doubao' : '/chat';
       const response = await fetch(`${API_ENDPOINT}${endpoint}`, {
@@ -182,42 +185,52 @@ export function useStream() {
 
                   // Start streaming on first content chunk
                   if (!hasStartedStreaming.current) {
-                    addAssistantMessage(currentMessageRef.current);
+                    const msg = addAssistantMessage(currentMessageRef.current, currentToolCallsRef.current);
+                    currentMessageIdRef.current = msg.id; // 🆕 保存消息ID
                     hasStartedStreaming.current = true;
                   } else {
                     // Update the existing message in real-time
                     updateLastAssistantMessage(currentMessageRef.current);
                   }
+
+                  // 🆕 对于 content 类型也添加事件（如果需要）
+                  appendWorkflowEvent(chunk);
                   break;
 
                 case 'workflow_step':
                   // 处理工作流步骤事件
                   handleWorkflowStep(chunk);
+                  appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'info_needed':
                   // 处理信息收集事件
                   handleInfoNeeded(chunk);
+                  appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'tool_call':
                   // 处理工具调用事件
                   handleToolCall(chunk);
+                  appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'processing':
                   // 处理处理进度事件
                   handleProcessing(chunk);
+                  appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'analysis_result':
                   // 处理分析结果事件
                   handleAnalysisResult(chunk);
+                  appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'ui_block_update':
                   // 🆕 处理UI Block更新事件
                   handleUIBlockUpdate(chunk);
+                  appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'error':
@@ -229,6 +242,7 @@ export function useStream() {
                   } else {
                     updateLastAssistantMessage(currentMessageRef.current);
                   }
+                  appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'done':
@@ -241,6 +255,7 @@ export function useStream() {
                       currentToolCallsRef.current.length > 0 ? currentToolCallsRef.current : undefined
                     );
                   }
+                  appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
               }
             } catch (e) {
@@ -254,8 +269,9 @@ export function useStream() {
       addAssistantMessage(`[Error: ${error instanceof Error ? error.message : 'Unknown error'}]`);
     } finally {
       setStreaming(false);
+      currentMessageIdRef.current = null; // 🆕 清空消息ID
     }
-  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage]);
+  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, appendWorkflowEvent]); // 🆕 添加依赖
 
   const executeTool = useCallback(async (
     toolCallId: string,
