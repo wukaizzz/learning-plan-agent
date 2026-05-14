@@ -17,12 +17,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 从Store获取草稿状态管理方法
-  const {
-    currentSessionId,
-    getSessionDraft,
-    setSessionDraft,
-    clearSessionDraft
-  } = useChatStore();
+  // 🆕 使用精确 selector，只订阅需要的字段
+  const currentSessionId = useChatStore(state => state.currentSessionId);
+  const getSessionDraft = useChatStore(state => state.getSessionDraft);
+  const setSessionDraft = useChatStore(state => state.setSessionDraft);
+  const clearSessionDraft = useChatStore(state => state.clearSessionDraft);
 
   // 本地状态同步Store中的草稿
   const [currentDraft, setCurrentDraft] = useState('');

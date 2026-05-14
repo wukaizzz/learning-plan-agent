@@ -58,11 +58,15 @@ export const useChatStore = create<ChatStore>()(
       }),
 
       setCurrentAgent: (agentId: string | null) => set((state) => {
-        state.currentAgentId = agentId;
+        if (state.currentAgentId !== agentId) {
+          state.currentAgentId = agentId;
+        }
       }),
 
       setStreaming: (isStreaming: boolean) => set((state) => {
-        state.isStreaming = isStreaming;
+        if (state.isStreaming !== isStreaming) {
+          state.isStreaming = isStreaming;
+        }
       }),
 
       updateToolCall: (toolCallId: string, updates) => set((state) => {
@@ -277,17 +281,29 @@ export const useChatStore = create<ChatStore>()(
             state.currentSessionId = sessionId;
             state.currentSpaceId = spaceId;
             state.messages = [];
+            // ✅ 重置工作流状态，避免旧数据污染
+            state.activeFormStep = 0;
+            state.formStepsData = {};
+            state.workflowInterrupted = false;
+            state.lastFormStep = null;
+            state.workspaceState = 'empty';
+            state.uiBlocks = [];
+            console.log('🔄 切换到新空间，工作流状态已重置');
           });
         }
       },
 
       // 🆕 工作流和Block管理
       setWorkspaceState: (newState: WorkspaceState) => set((state) => {
-        state.workspaceState = newState;
+        if (state.workspaceState !== newState) {
+          state.workspaceState = newState;
+        }
       }),
 
       setUIBlocks: (blocks: UIBlock[]) => set((state) => {
-        state.uiBlocks = blocks;
+        if (state.uiBlocks !== blocks && state.uiBlocks.length !== blocks.length) {
+          state.uiBlocks = blocks;
+        }
       }),
 
       addUIBlock: (block: UIBlock) => set((state) => {
@@ -295,7 +311,9 @@ export const useChatStore = create<ChatStore>()(
       }),
 
       clearUIBlocks: () => set((state) => {
-        state.uiBlocks = [];
+        if (state.uiBlocks.length > 0) {
+          state.uiBlocks = [];
+        }
       }),
 
       getWorkspaceState: () => {
@@ -306,7 +324,7 @@ export const useChatStore = create<ChatStore>()(
       // 🆕 Scroll position management
       saveScrollPosition: (sessionId: string, position: number) => set((state) => {
         const session = state.sessions.find(s => s.id === sessionId);
-        if (session) {
+        if (session && session.scrollPosition !== position) {
           session.scrollPosition = position;
         }
       }),
@@ -319,26 +337,38 @@ export const useChatStore = create<ChatStore>()(
 
       // 🆕 Multi-form collection management
       setActiveFormStep: (step: number) => set((state) => {
-        state.activeFormStep = step;
+        if (state.activeFormStep !== step) {
+          state.activeFormStep = step;
+        }
       }),
-
+ 
       submitFormStep: (stepIndex: number, data: Record<string, any>) => set((state) => {
-        state.formStepsData[stepIndex] = data;
-        console.log(`✅ 表单步骤 ${stepIndex} 提交成功:`, data);
+        const existingData = state.formStepsData[stepIndex];
+        if (!existingData || JSON.stringify(existingData) !== JSON.stringify(data)) {
+          state.formStepsData[stepIndex] = data;
+          console.log(`✅ 表单步骤 ${stepIndex} 提交成功:`, data);
+        }
       }),
 
       markWorkflowInterrupted: (step: number) => set((state) => {
-        state.workflowInterrupted = true;
-        state.lastFormStep = step;
-        console.log(`⚠️ 工作流在步骤 ${step} 中断`);
+        if (!state.workflowInterrupted || state.lastFormStep !== step) {
+          state.workflowInterrupted = true;
+          state.lastFormStep = step;
+          console.log(`⚠️ 工作流在步骤 ${step} 中断`);
+        }
       }),
-
+      
       resetFormCollection: () => set((state) => {
-        state.activeFormStep = 0;
-        state.formStepsData = {};
-        state.workflowInterrupted = false;
-        state.lastFormStep = null;
-        console.log('🔄 表单收集状态已重置');
+        if (state.activeFormStep !== 0 || 
+            Object.keys(state.formStepsData).length > 0 || 
+            state.workflowInterrupted !== false ||
+            state.lastFormStep !== null) {
+          state.activeFormStep = 0;
+          state.formStepsData = {};
+          state.workflowInterrupted = false;
+          state.lastFormStep = null;
+          console.log('🔄 表单收集状态已重置');
+        }
       }),
 
       isFormCollectionComplete: () => {

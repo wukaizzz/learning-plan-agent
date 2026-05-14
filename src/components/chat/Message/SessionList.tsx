@@ -4,15 +4,14 @@ import { Plus, MessageSquare, Trash2, Clock } from 'lucide-react';
 import './SessionList.css';
 
 export const SessionList: React.FC = () => {
-  const {
-    sessions,
-    currentSessionId,
-    currentSpaceId,
-    switchSession,
-    deleteSession,
-    createNewSession,
-    getSessionsBySpace
-  } = useChatStore();
+  // 🆕 使用精确 selector，只订阅需要的字段
+  const sessions = useChatStore(state => state.sessions);
+  const currentSessionId = useChatStore(state => state.currentSessionId);
+  const currentSpaceId = useChatStore(state => state.currentSpaceId);
+  const switchSession = useChatStore(state => state.switchSession);
+  const deleteSession = useChatStore(state => state.deleteSession);
+  const createNewSession = useChatStore(state => state.createNewSession);
+  const getSessionsBySpace = useChatStore(state => state.getSessionsBySpace);
 
   // 使用 useMemo 避免在 useEffect 中调用 setState
   const sessionList = React.useMemo(() => {

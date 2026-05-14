@@ -10,7 +10,7 @@
  * - 🆕 支持多表单顺序收集
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router';
 import { useLangGraphWorkflow } from '@/hooks/useLangGraphWorkflow';
 import { useChatStore } from '@/store/chatStore';
@@ -30,14 +30,22 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   const [isExpanded, setIsExpanded] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
 
-  // 🆕 获取 chatStore 用于多表单管理
-  const {
-    activeFormStep,
-    formStepsData,
-    setActiveFormStep,
-    submitFormStep,
-    markWorkflowInterrupted
-  } = useChatStore();
+  // 🆕 使用精确 selector，只订阅需要的字段
+  const activeFormStep = useChatStore(state => state.activeFormStep);
+  const formStepsData = useChatStore(state => state.formStepsData);
+  const submitFormStep = useChatStore(state => state.submitFormStep);
+  const setActiveFormStep = useChatStore(state => state.setActiveFormStep);
+  const markWorkflowInterrupted = useChatStore(state => state.markWorkflowInterrupted);
+
+  // 🆕 使用 ref 存储最新状态和函数引用
+  const latestStateRef = useRef({
+    workspaceState,
+     activeFormStep,
+     totalFormSteps: 0,
+   });
+  
+  const markWorkflowInterruptedRef = useRef(markWorkflowInterrupted);
+  const hasMarkedInterruptedRef = useRef(false);
 
   // 获取路由参数和工作流 hooks
   const { spaceId } = useParams();
@@ -46,6 +54,16 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   // 🆕 获取 collection-form blocks
   const collectionForms = uiBlocks.filter(block => block.type === 'collection-form');
   const totalFormSteps = collectionForms.length;
+
+  // 始终同步最新值到 ref
+  useEffect(() => {
+    latestStateRef.current = {
+      workspaceState,
+      activeFormStep,
+      totalFormSteps,
+    };
+    markWorkflowInterruptedRef.current = markWorkflowInterrupted;
+  }, [workspaceState, activeFormStep, totalFormSteps, markWorkflowInterrupted]);
 
   /**
    * 处理表单提交
@@ -74,10 +92,9 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
 
     try {
       // 🆕 合并所有表单数据
-      const allFormData = Object.values(formStepsData).reduce((acc, data) => ({
-        ...acc,
-        ...data
-      }), formData);
+      const allFormData = Object.values(formStepsData).reduce((acc, data) => {
+        return { ...acc, ...(data as Record<string, unknown>) };
+      }, formData as Record<string, unknown>);
 
       console.log('📝 提交所有表单数据:', allFormData);
 
@@ -110,6 +127,24 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
     showProgress: totalFormSteps > 1
   };
 
+  // 🆕 组件卸载时标记工作流中断（只在真正卸载时执行）
+  useEffect(() => {
+    hasMarkedInterruptedRef.current = false;
+    
+    return () => {
+      if (hasMarkedInterruptedRef.current) {
+        return;
+      }
+      
+      const { workspaceState, activeFormStep, totalFormSteps } = latestStateRef.current;
+      
+      if (workspaceState === 'collecting' && activeFormStep < totalFormSteps) {
+        hasMarkedInterruptedRef.current = true;
+        markWorkflowInterruptedRef.current(activeFormStep);  // ✅ 使用 ref 中的函数引用
+      }
+    };
+  }, []); // ✅ 空依赖数组，只在卸载时执行
+
   // workspaceState 为 'empty' 时不显示
   if (workspaceState === 'empty' || uiBlocks.length === 0) {
     return null;
@@ -121,16 +156,6 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   const currentUIBlocks = currentFormBlock
     ? [...nonFormBlocks, currentFormBlock]
     : nonFormBlocks;
-
-  // 🆕 组件卸载时标记工作流中断
-  useEffect(() => {
-    return () => {
-      if (workspaceState === 'collecting' && activeFormStep < totalFormSteps) {
-        console.log('⚠️ 工作流卸载，标记在步骤', activeFormStep, '中断');
-        markWorkflowInterrupted(activeFormStep);
-      }
-    };
-  }, [workspaceState, activeFormStep, totalFormSteps, markWorkflowInterrupted]);
 
   const handleToggleExpand = () => {
     setIsExpanded(!isExpanded);

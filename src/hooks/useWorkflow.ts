@@ -9,7 +9,7 @@
  * - 支持状态历史记录
  */
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useChatStore } from '../store/chatStore';
 import { getBlocksForState, getNextState, getPreviousState } from '../core/workflow/workflowManager';
 import type { WorkspaceState } from '../types/uiBlocks';
@@ -158,17 +158,32 @@ export const useWorkflow = (): UseWorkflowReturn => {
    */
   const isWorkflowActive = workspaceState !== 'empty';
 
+  // 防止重复重置工作流
+  const resetWorkflowRef = useRef(resetWorkflow);
+  const hasResetRef = useRef(false);
+
+  // 确保引用在 resetWorkflow 变化时更新
+  useEffect(() => {
+    resetWorkflowRef.current = resetWorkflow;
+  }, [resetWorkflow]);
+
   /**
    * 当会话切换时，重置工作流状态
    */
   useEffect(() => {
+    hasResetRef.current = false;
+
     return () => {
-      // 组件卸载或会话切换时重置
+      if (hasResetRef.current) {
+        return;
+      }
+
       if (currentSessionId) {
-        resetWorkflow();
+        hasResetRef.current = true;
+        resetWorkflowRef.current();
       }
     };
-  }, [currentSessionId, resetWorkflow]);
+  }, [currentSessionId]);
 
   return {
     // 状态

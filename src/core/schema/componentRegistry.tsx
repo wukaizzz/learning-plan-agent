@@ -63,9 +63,14 @@ const PlaceholderBlock: React.FC<{ block: UIBlock }> = ({ block }) => (
 );
 
 /**
- * 字段名展平函数
- * 将嵌套字段名（如 'goal.examDate'）展平为简单字段名（如 'examDate'）
- * 保留原始路径用于映射回后端
+ * 扁平化字段名称
+ * 将嵌套的字段名称（如 'goal.examDate'）扁平化（'examDate'）
+ * 同时保留原始路径用于后续处理
+ * 
+ * 注意：这个函数会返回一个新的数组引用，如果传入的 fields 内容相同但引用不同，
+ * 返回值也会不同。这可能导致子组件的 useEffect 重复触发。
+ * 
+ * 优化建议：在调用处使用 useMemo 缓存结果，或者在组件内部处理字段扁平化
  */
 const flattenFieldNames = (fields: FormField[]): FormField[] => {
   return fields.map(field => ({

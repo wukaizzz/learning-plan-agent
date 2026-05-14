@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 import { MessageList,MessageInput,SessionList } from '@/components/chat/message';
@@ -19,19 +19,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
   const { messages, isStreaming, addUserMessage } = useChat();
   const { streamResponse } = useStream();
   const { getCurrentAgentConfig } = useAgent();
-  const {
-    currentSessionId,
-    createNewSession,
-    switchToSpaceSession,
-    setCurrentSpace,
-    workspaceState,
-    uiBlocks,
-    activeFormStep,
-    workflowInterrupted,
-    lastFormStep,
-    setActiveFormStep,
-    resetFormCollection
-  } = useChatStore();
+  const { switchToSpaceSession, resetFormCollection, createNewSession, setCurrentSpace, uiBlocks } = useChatStore();
+  
+  // 🆕 使用精确 selector，只订阅需要的字段
+  const workspaceState = useChatStore(state => state.workspaceState);
+  const workflowInterrupted = useChatStore(state => state.workflowInterrupted);
+  const lastFormStep = useChatStore(state => state.lastFormStep);
+  const activeFormStep = useChatStore(state => state.activeFormStep);
+  const setActiveFormStep = useChatStore(state => state.setActiveFormStep);
+  const currentSessionId = useChatStore(state => state.currentSessionId);
   const { transitionToState, isWorkflowActive } = useWorkflow();
   const navigate = useNavigate();
   const { spaceId } = useParams();
@@ -39,8 +35,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
 
   const currentSpace = getCurrentSpace();
 
-  // 🆕 状态：是否显示恢复提示
+  // 🆕 本地状态：是否显示恢复提示
   const [showResumePrompt, setShowResumePrompt] = useState(false);
+  const [localFormStep, setLocalFormStep] = useState<number | null>(null);
+  
+  // 🆕 使用 ref 存储最新状态
+  const latestStateRef = useRef({
+    workspaceState,
+    workflowInterrupted,
+    lastFormStep,
+  });
+  
+  // 同步最新状态到 ref
+  useEffect(() => {
+    latestStateRef.current = {
+      workspaceState,
+      workflowInterrupted,
+      lastFormStep,
+    };
+  }, [workspaceState, workflowInterrupted, lastFormStep]);
 
   // 退出空间处理
   const handleExitSpace = () => {
@@ -51,15 +64,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
 
   // 🆕 处理恢复工作流
   const handleResumeWorkflow = () => {
-    console.log('▶️ 继续工作流，从步骤:', activeFormStep);
+    console.log('▶️ 继续工作流，从步骤:', localFormStep);
     setShowResumePrompt(false);
-    // 继续显示当前的表单
+    // 使用本地状态，避免不必要的 store 更新
+    if (activeFormStep !== localFormStep && localFormStep !== null) {
+      setActiveFormStep(localFormStep);
+    }
   };
 
   // 🆕 处理重新开始工作流
   const handleRestartWorkflow = () => {
     console.log('🔄 重新开始工作流');
     setShowResumePrompt(false);
+    setLocalFormStep(0);
     resetFormCollection();
     setActiveFormStep(0);
     transitionToState('collecting');
@@ -82,20 +99,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
       console.log('🎯 调用 switchToSpaceSession:', spaceId);
       switchToSpaceSession(spaceId);
     } else if (!currentSessionId) {
-      // 如果没有 spaceId 且没有当前会话，创建通用会话
       console.log('📝 创建新的通用会话');
       createNewSession();
     }
-  }, [spaceId]); // 只依赖 spaceId，避免无限循环
+  }, [spaceId, currentSessionId, switchToSpaceSession]); // ✅ createNewSession 不需要作为依赖
 
-  // 🆕 工作流恢复检测
+  // 🆕 工作流恢复检测（使用 ref + 空依赖数组）
   useEffect(() => {
+    const { workspaceState, workflowInterrupted, lastFormStep } = latestStateRef.current;
+    
     if (workspaceState === 'collecting' && workflowInterrupted && lastFormStep !== null) {
       console.log('⚠️ 检测到中断的工作流，步骤:', lastFormStep);
+      setLocalFormStep(lastFormStep);
       setShowResumePrompt(true);
-      setActiveFormStep(lastFormStep);
     }
-  }, [workspaceState, workflowInterrupted, lastFormStep, setActiveFormStep]);
+  }, []); // ✅ 空依赖数组，只在组件挂载时检查一次
 
   // 🆕 组件卸载时标记工作流中断
   useEffect(() => {

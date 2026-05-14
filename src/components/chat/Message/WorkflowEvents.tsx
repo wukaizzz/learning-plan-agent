@@ -9,7 +9,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import type { WorkflowEvent, WorkflowStepEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, InfoNeededEvent } from '@/types/workflowEvents';
+import type { WorkflowEvent, WorkflowStepEvent, 
+  ToolCallEvent, ProcessingEvent, 
+  AnalysisResultEvent, InfoNeededEvent } from '@/types/workflowEvents';
 import './WorkflowEvents.css';
 
 interface WorkflowEventsProps {

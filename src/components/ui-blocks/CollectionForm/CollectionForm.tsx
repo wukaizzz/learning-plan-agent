@@ -55,13 +55,22 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
   // 初始化表单数据
   useEffect(() => {
     const initialData: Record<string, any> = {};
+    
+    // ✅ 先检查是否需要初始化（避免无限循环）
+    let needsInit = false;
     fields.forEach(field => {
-      if (field.value !== undefined) {
+      // 只在字段不存在时才初始化
+      if (field.value !== undefined && formData[field.name] === undefined) {
         initialData[field.name] = field.value;
+        needsInit = true;
       }
     });
-    setFormData(initialData);
-  }, [fields]);
+    
+    // ✅ 只有在真正需要初始化时才更新状态
+    if (needsInit) {
+      setFormData(initialData);
+    }
+  }, [fields]); // ✅ fields 变化时重新计算
 
   const handleFieldChange = (name: string, value: any) => {
     setFormData(prev => ({
@@ -119,7 +128,7 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
 
     setIsSubmitting(true);
     try {
-      await onSubmit(formData);
+      onSubmit(formData);
       setIsSubmitted(true); // 🆕 标记为已提交
     } catch (error) {
       console.error('表单提交失败:', error);

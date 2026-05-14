@@ -19,7 +19,10 @@ export const MessageList: React.FC<MessageListProps> = ({
   const prevMessagesLengthRef = useRef<number>(0);
   const isNewSessionRef = useRef<boolean>(true);
 
-  const { currentSessionId, saveScrollPosition, getScrollPosition } = useChatStore();
+  // 🆕 使用精确 selector，只订阅需要的字段
+  const currentSessionId = useChatStore(state => state.currentSessionId);
+  const saveScrollPosition = useChatStore(state => state.saveScrollPosition);
+  const getScrollPosition = useChatStore(state => state.getScrollPosition);
 
   // 🆕 使用useLayoutEffect在组件挂载时恢复滚动位置
   useLayoutEffect(() => {
@@ -37,21 +40,17 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
   }, [currentSessionId, getScrollPosition, messages.length]);
 
-  // 🆕 组件卸载时保存当前滚动位置
+  // 🆕 组件卸载时保存当前滚动位置（使用 ref + 空依赖数组）
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (currentSessionId && messagesContainerRef.current) {
-        saveScrollPosition(currentSessionId, messagesContainerRef.current.scrollTop);
+    return () => {
+      if (currentSessionId) {
+        const container = messagesContainerRef.current;
+        if (container) {
+          saveScrollPosition(currentSessionId, container.scrollTop);
+        }
       }
     };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      handleBeforeUnload();
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [currentSessionId, saveScrollPosition]);
+  }, []); // ✅ 空依赖数组，只在卸载时执行一次
 
   // 🆕 实时保存滚动位置（用于会话切换时保存位置）
   useEffect(() => {
@@ -67,7 +66,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     return () => {
       container.removeEventListener('scroll', handleScroll);
     };
-  }, [currentSessionId, saveScrollPosition]);
+  }, [currentSessionId, saveScrollPosition]); // ✅ 函数引用现在是稳定的（由于 selector）
 
   // 有新消息时，如果用户已经在底部，则自动滚动到底部
   useEffect(() => {
