@@ -24,17 +24,6 @@ export const SpaceCard: React.FC<SpaceCardProps> = ({ space }) => {
     // 跳转到对应的聊天页面
     navigate(`/workSpace/${space.id}`);
   };
-  // 计算距离考试的天数
-  const getDaysUntilExam = () => {
-    if (!space?.goal.examDate) return 0;
-    const now = new Date();
-    const examTime = new Date(space.goal.examDate).getTime();
-    const diff = examTime - now.getTime();
-    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-  };
-
-  const daysUntilExam = getDaysUntilExam();
-
   // 格式化考试日期
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString('zh-CN', {

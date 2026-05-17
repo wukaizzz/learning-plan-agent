@@ -7,6 +7,7 @@ import './CollectionForm.css';
 // 表单字段定义
 export interface FormField {
   name: string;
+  originalPath?: string;
   label: string;
   type: 'text' | 'number' | 'date' | 'select' | 'textarea';
   value?: any;
@@ -20,7 +21,7 @@ export interface FormField {
 interface CollectionFormProps {
   stage?: 'initial' | 'details' | 'confirmation';
   fields: FormField[];
-  onSubmit: (data: Record<string, any>) => void;
+  onSubmit: (data: Record<string, any>) => void | Promise<void>;
   onCancel?: () => void;
   title?: string;
   description?: string;
@@ -128,7 +129,12 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
 
     setIsSubmitting(true);
     try {
-      onSubmit(formData);
+      const submitData = fields.reduce<Record<string, any>>((acc, field) => {
+        acc[field.originalPath || field.name] = formData[field.name];
+        return acc;
+      }, {});
+
+      await onSubmit(submitData);
       setIsSubmitted(true); // 🆕 标记为已提交
     } catch (error) {
       console.error('表单提交失败:', error);

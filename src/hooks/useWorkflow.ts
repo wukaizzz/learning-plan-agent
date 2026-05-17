@@ -62,14 +62,6 @@ export const useWorkflow = (): UseWorkflowReturn => {
     const newBlocks = getBlocksForState(newState);
     setWorkspaceState(newState);
     setUIBlocks(newBlocks);
-
-    // 记录状态转换历史（可选）
-    const historyItem: WorkflowHistoryItem = {
-      state: newState,
-      timestamp: Date.now(),
-      blocks: newBlocks
-    };
-
     console.log('✅ Transition completed, blocks generated:', newBlocks.length);
   }, [workspaceState, setWorkspaceState, setUIBlocks]);
 

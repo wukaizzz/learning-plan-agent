@@ -458,9 +458,6 @@ const SubjectsStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
     weakPoints: [] as string[],
     strongPoints: [] as string[]
   });
-
-  const [tempPoint, setTempPoint] = useState('');
-
   // Tab键快速补全默认值
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, field: string) => {
     if (e.key === 'Tab') {
@@ -518,17 +515,6 @@ const SubjectsStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
       subjects: data.subjects.filter((_, i) => i !== index)
     });
   };
-
-  const addWeakPoint = () => {
-    if (tempPoint.trim()) {
-      setNewSubject({
-        ...newSubject,
-        weakPoints: [...newSubject.weakPoints, tempPoint.trim()]
-      });
-      setTempPoint('');
-    }
-  };
-
   return (
     <div className="wizard-step-content">
       <h3>学科设置</h3>

@@ -15,8 +15,7 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
   title = '每日任务',
   date,
   tasks,
-  totalDuration,
-  completionRate
+  totalDuration
 }) => {
   const [taskStates, setTaskStates] = useState<Record<string, 'pending' | 'in_progress' | 'completed' | 'skipped'>>(
     tasks.reduce((acc, task) => ({ ...acc, [task.id]: task.status }), {})
@@ -115,7 +114,7 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
 
       {/* 任务列表 */}
       <div className="daily-task-items">
-        {tasks.map((task, index) => {
+        {tasks.map((task) => {
           const taskStatus = taskStates[task.id] || task.status;
           return (
             <div

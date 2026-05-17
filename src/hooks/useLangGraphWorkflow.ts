@@ -58,7 +58,6 @@ export interface UseLangGraphWorkflowReturn {
 export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
   const {
     setWorkspaceState,
-    setUIBlocks,
     addUIBlock,
     clearUIBlocks
   } = useChatStore();

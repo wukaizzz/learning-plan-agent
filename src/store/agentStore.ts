@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AgentStore, AgentConfig } from '../types/agent';
+import type { AgentStore } from '../types/agent';
 import { immer } from 'zustand/middleware/immer';
 export const useAgentStore = create<AgentStore>()(
   persist(

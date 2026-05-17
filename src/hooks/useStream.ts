@@ -1,7 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { useChat } from './useChat';
 import { useAgent } from './useAgent';
-import { useWorkflow } from './useWorkflow';
 import { useChatStore } from '../store/chatStore';
 import { API_ENDPOINT } from '../utils/constants';
 import type { Message } from '../types/chat';
@@ -11,8 +10,7 @@ export function useStream() {
   const { addAssistantMessage, setStreaming, 
   updateToolCall, updateLastAssistantMessage, appendWorkflowEvent } = useChat();
   const { getCurrentAgentConfig } = useAgent();
-  const { transitionToState } = useWorkflow();
-  const { addUIBlock } = useChatStore();
+  const { addUIBlock, clearUIBlocks, setWorkspaceState } = useChatStore();
   const currentMessageRef = useRef<string>('');
   const currentToolCallsRef = useRef<any[]>([]);
   const hasStartedStreaming = useRef<boolean>(false);
@@ -21,14 +19,18 @@ export function useStream() {
   // 工作流事件处理函数
   const handleWorkflowStep = useCallback((event: WorkflowStepEvent) => {
     console.log('🔄 Workflow step:', event);
-    // 转换到对应的工作流状态
-    transitionToState(event.step);
+    // 只同步后端工作流阶段，不从 workflowManager 注入本地 mock blocks。
+    setWorkspaceState(event.step);
+
+    if (event.step === 'collecting') {
+      clearUIBlocks();
+    }
 
     // 可以在这里添加进度条更新逻辑
     if (event.progress !== undefined) {
       console.log(`Progress: ${event.progress}%`);
     }
-  }, [transitionToState]);
+  }, [clearUIBlocks, setWorkspaceState]);
 
   const handleInfoNeeded = useCallback((event: InfoNeededEvent) => {
     console.log('❓ Info needed:', event);

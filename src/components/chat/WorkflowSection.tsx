@@ -106,10 +106,14 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       } else if (response.error) {
         console.error('❌ 表单提交失败:', response.error);
         alert(`提交失败: ${response.error}`);
+        throw new Error(response.error);
+      } else {
+        throw new Error('工作流恢复失败');
       }
     } catch (err) {
       console.error('❌ 表单提交异常:', err);
       alert('提交失败，请稍后重试');
+      throw err;
     }
   };
 

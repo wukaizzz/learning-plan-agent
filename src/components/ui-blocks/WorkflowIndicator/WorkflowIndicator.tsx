@@ -29,7 +29,7 @@ export const WorkflowIndicator: React.FC<WorkflowIndicatorComponentProps> = ({
   title
 }) => {
   // 获取步骤状态
-  const getStepStatus = (stepState: string, index: number, currentStateIndex: number) => {
+  const getStepStatus = (index: number, currentStateIndex: number) => {
     if (index < currentStateIndex) return 'completed';
     if (index === currentStateIndex) return 'current';
     return 'pending';
@@ -50,7 +50,7 @@ export const WorkflowIndicator: React.FC<WorkflowIndicatorComponentProps> = ({
         {/* 水平步骤条 */}
         <div className="workflow-steps-horizontal">
           {steps.map((step, index) => {
-            const status = getStepStatus(step.state, index, currentStateIndex);
+            const status = getStepStatus(index, currentStateIndex);
             const isCurrentStep = status === 'current';
 
             return (
