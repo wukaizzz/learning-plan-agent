@@ -16,6 +16,14 @@ import { useLangGraphWorkflow } from '@/hooks/useLangGraphWorkflow';
 import { useChatStore } from '@/store/chatStore';
 import { renderBlocks, type RenderContext } from '../../core/schema/componentRegistry.tsx';
 import type { UIBlock, WorkspaceState } from '../../types/uiBlocks';
+import './WorkflowSection.css';
+
+const WORKFLOW_BLOCK_TYPES = new Set([
+  'collection-form',
+  'workflow-indicator',
+  'generating-skeleton',
+  'tool-call-status'
+]);
 
 interface WorkflowSectionProps {
   workspaceState: WorkspaceState;
@@ -35,6 +43,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   const formStepsData = useChatStore(state => state.formStepsData);
   const submitFormStep = useChatStore(state => state.submitFormStep);
   const setActiveFormStep = useChatStore(state => state.setActiveFormStep);
+  const setWorkspaceState = useChatStore(state => state.setWorkspaceState);
   const markWorkflowInterrupted = useChatStore(state => state.markWorkflowInterrupted);
 
   // 🆕 使用 ref 存储最新状态和函数引用
@@ -50,9 +59,10 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   // 获取路由参数和工作流 hooks
   const { spaceId } = useParams();
   const { resume, isLoading, error } = useLangGraphWorkflow();
+  const workflowBlocks = uiBlocks.filter(block => WORKFLOW_BLOCK_TYPES.has(block.type));
 
   // 🆕 获取 collection-form blocks
-  const collectionForms = uiBlocks.filter(block => block.type === 'collection-form');
+  const collectionForms = workflowBlocks.filter(block => block.type === 'collection-form');
   const totalFormSteps = collectionForms.length;
 
   // 始终同步最新值到 ref
@@ -97,6 +107,8 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
       }, formData as Record<string, unknown>);
 
       console.log('📝 提交所有表单数据:', allFormData);
+
+      setWorkspaceState('analyzing');
 
       const response = await resume(spaceId, allFormData as Record<string, string | number>);
 
@@ -150,13 +162,13 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({
   }, []); // ✅ 空依赖数组，只在卸载时执行
 
   // workspaceState 为 'empty' 时不显示
-  if (workspaceState === 'empty' || uiBlocks.length === 0) {
+  if (workspaceState === 'empty' || workflowBlocks.length === 0) {
     return null;
   }
 
   // 🆕 过滤 UI Blocks：只显示当前步骤的表单和其他非表单 blocks
   const currentFormBlock = collectionForms[activeFormStep];
-  const nonFormBlocks = uiBlocks.filter(block => block.type !== 'collection-form');
+  const nonFormBlocks = workflowBlocks.filter(block => block.type !== 'collection-form');
   const currentUIBlocks = currentFormBlock
     ? [...nonFormBlocks, currentFormBlock]
     : nonFormBlocks;
