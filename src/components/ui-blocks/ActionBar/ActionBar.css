@@ -7,6 +7,8 @@
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .action-bar-title {
@@ -27,6 +29,7 @@
 .action-button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 10px 20px;
   border-radius: 8px;
@@ -36,6 +39,8 @@
   transition: all 0.2s ease;
   border: none;
   outline: none;
+  min-width: 0;
+  white-space: normal;
 }
 
 .action-button:disabled {
@@ -48,7 +53,8 @@
 }
 
 .action-button-label {
-  line-height: 1;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 /* Primary 按钮样式 */
