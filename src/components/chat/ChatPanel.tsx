@@ -6,10 +6,85 @@ import { WorkflowSection } from './WorkflowSection';
 import { PlanWorkspace } from './PlanWorkspace';
 import { WorkflowResumePrompt } from '@/components/workflow-resume/WorkflowResumePrompt';
 import { useChat, useStream, useAgent, useWorkflow } from '@/hooks';
+import { useLangGraphWorkflow } from '@/hooks/useLangGraphWorkflow';
 import { useChatStore,useSpaceStore } from '@/store';
+import { transformUIBlock, type WorkflowResponse } from '@/services/workflowApi';
 import type { Message } from '@/types';
 
 import './ChatPanel.css';
+
+const RESUME_STATUS_TEXT = '正在分析你的考试时间、目标分数';
+const RESUME_STEP_LABELS: Record<string, string> = {
+  analyze_requirements: '已完成：分析考试时间和目标分数',
+  generate_plan: '已完成：生成学习计划',
+  build_ui_blocks: '已完成：构建计划展示'
+};
+
+type CollectionFormField = {
+  name: string;
+  label?: string;
+};
+
+function stringifySubmittedValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.join(', ');
+  }
+
+  if (value === null || value === undefined || value === '') {
+    return '未填写';
+  }
+
+  return String(value);
+}
+
+function createSubmittedFormSummary(
+  formData: Record<string, unknown>,
+  messages: Message[]
+) {
+  const formMessage = [...messages].reverse().find(message =>
+    message.role === 'assistant' &&
+    message.ui_blocks?.some(block => block.type === 'collection-form') &&
+    message.form_submission_state !== 'submitted'
+  );
+  const fields: CollectionFormField[] = formMessage?.ui_blocks
+    ?.filter(block => block.type === 'collection-form')
+    .flatMap(block => block.props?.fields || []) || [];
+
+  if (fields.length === 0) {
+    return Object.entries(formData).map(([key, value]) => ({
+      label: key,
+      value: stringifySubmittedValue(value)
+    }));
+  }
+
+  return fields.map(field => ({
+    label: field.label || field.name,
+    value: stringifySubmittedValue(formData[field.name])
+  }));
+}
+
+function formatResumeStatusMessage(response: WorkflowResponse): string {
+  if (!response.success) {
+    return `${RESUME_STATUS_TEXT}\n\n提交失败：${response.error || '未知错误'}`;
+  }
+
+  const completedNodes = new Set(response.state?.workflow.history?.map(item => item.node) || []);
+  const lines = [RESUME_STATUS_TEXT, ''];
+
+  Object.entries(RESUME_STEP_LABELS).forEach(([node, label]) => {
+    if (completedNodes.has(node) || response.state?.workflow.stage === 'finalized') {
+      lines.push(`- ${label}`);
+    }
+  });
+
+  if (response.interrupted) {
+    lines.push('- 还需要补充更多信息');
+  } else if (response.state?.workflow.stage === 'finalized') {
+    lines.push('- 已完成：学习计划已生成');
+  }
+
+  return lines.join('\n');
+}
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface ChatPanelProps {
@@ -17,19 +92,33 @@ interface ChatPanelProps {
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = () => {
-  const { messages, isStreaming, addUserMessage } = useChat();
+  const { messages, isStreaming, addUserMessage, addAssistantMessage } = useChat();
   const { streamResponse } = useStream();
   const { getCurrentAgentConfig } = useAgent();
-  const { switchToSpaceSession, resetFormCollection, createNewSession, setCurrentSpace, uiBlocks } = useChatStore();
+  const {
+    switchToSpaceSession,
+    resetFormCollection,
+    createNewSession,
+    setCurrentSpace,
+    uiBlocks,
+    submitFormStep,
+    setWorkspaceState,
+    markLatestCollectionFormSubmitting,
+    markLatestCollectionFormSubmitted,
+    resetLatestCollectionFormSubmissionState,
+    updateMessage
+  } = useChatStore();
   
   // 🆕 使用精确 selector，只订阅需要的字段
   const workspaceState = useChatStore(state => state.workspaceState);
   const workflowInterrupted = useChatStore(state => state.workflowInterrupted);
   const lastFormStep = useChatStore(state => state.lastFormStep);
   const activeFormStep = useChatStore(state => state.activeFormStep);
+  const formStepsData = useChatStore(state => state.formStepsData);
   const setActiveFormStep = useChatStore(state => state.setActiveFormStep);
   const currentSessionId = useChatStore(state => state.currentSessionId);
   const { transitionToState, isWorkflowActive } = useWorkflow();
+  const { resume } = useLangGraphWorkflow();
   const navigate = useNavigate();
   const { spaceId } = useParams();
   const { getCurrentSpace } = useSpaceStore();
@@ -134,6 +223,52 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
     };
   }, [workspaceState, workflowInterrupted, activeFormStep]);
 
+  const handleCollectionFormSubmit = async (formData: Record<string, unknown>) => {
+    submitFormStep(activeFormStep, formData);
+
+    if (!spaceId) {
+      alert('无法提交：缺少学习空间标识');
+      return;
+    }
+
+    const previousFormData = Object.values(formStepsData).reduce<Record<string, unknown>>((acc, data) => {
+      return { ...acc, ...(data as Record<string, unknown>) };
+    }, {});
+    const allFormData = { ...previousFormData, ...formData };
+    const summary = createSubmittedFormSummary(allFormData, messages);
+
+    markLatestCollectionFormSubmitting();
+    setWorkspaceState('analyzing');
+    const statusMessage = addAssistantMessage(RESUME_STATUS_TEXT);
+
+    try {
+      const response = await resume(spaceId, allFormData as Record<string, string | number>);
+
+      if (!response.success) {
+        throw new Error(response.error || '工作流恢复失败');
+      }
+
+      markLatestCollectionFormSubmitted(summary);
+      updateMessage(statusMessage.id, formatResumeStatusMessage(response));
+
+      const collectionForms = response.state?.uiBlocks
+        ?.filter(block => block.type === 'collection-form')
+        .map(transformUIBlock) || [];
+
+      if (response.interrupted && collectionForms.length > 0) {
+        addAssistantMessage(response.message || '还需要补充更多信息', undefined, {
+          ui_blocks: collectionForms,
+          form_submission_state: 'idle'
+        });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      resetLatestCollectionFormSubmissionState();
+      updateMessage(statusMessage.id, `${RESUME_STATUS_TEXT}\n\n提交失败：${errorMessage}`);
+      throw error;
+    }
+  };
+
   const handleSendMessage = async (content: string) => {
     // Add user message
     const userMessage = addUserMessage(content);
@@ -219,7 +354,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
                 onStateChange={transitionToState}
               />
             )}
-            <MessageList messages={messages} isStreaming={isStreaming} />
+            <MessageList
+              messages={messages}
+              isStreaming={isStreaming}
+              onCollectionFormSubmit={handleCollectionFormSubmit}
+            />
           </div>
 
           {/* Input */}

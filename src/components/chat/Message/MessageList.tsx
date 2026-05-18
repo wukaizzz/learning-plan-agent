@@ -8,11 +8,13 @@ import './MessageList.css';
 interface MessageListProps {
   messages: Message[];
   isStreaming?: boolean;
+  onCollectionFormSubmit?: (data: Record<string, unknown>) => Promise<void>;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
-  isStreaming = false
+  isStreaming = false,
+  onCollectionFormSubmit
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -136,7 +138,10 @@ export const MessageList: React.FC<MessageListProps> = ({
             key={message.id}
             className={messageClassName}
           >
-            <MessageItem message={message} />
+            <MessageItem
+              message={message}
+              onCollectionFormSubmit={onCollectionFormSubmit}
+            />
           </div>
         );
       })}

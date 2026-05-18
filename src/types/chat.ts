@@ -9,6 +9,9 @@ export interface Message {
   content: string;
   timestamp: number;
   tool_calls?: ToolCall[];
+  ui_blocks?: UIBlock[];
+  submitted_form_summary?: SubmittedFormSummaryItem[];
+  form_submission_state?: 'idle' | 'submitting' | 'submitted';
   workflow_events?: WorkflowEvent[]; // 🆕 该消息关联的工作流事件
 }
 
@@ -19,6 +22,11 @@ export interface ToolCall {
   result?: unknown;
   status: 'pending' | 'completed' | 'failed';
   error?: string;
+}
+
+export interface SubmittedFormSummaryItem {
+  label: string;
+  value: string;
 }
 
 export interface ChatSession {
@@ -57,6 +65,11 @@ export interface ChatStore {
   deleteMessage: (messageId: string) => void;
   addToolCall: (messageId: string, toolCall: ToolCall) => void;
   updateLastAssistantMessage: (content: string) => void;
+  addUIBlockToMessage: (messageId: string, block: UIBlock) => void;
+  addUIBlockToLastAssistantMessage: (block: UIBlock) => void;
+  markLatestCollectionFormSubmitting: () => void;
+  markLatestCollectionFormSubmitted: (summary: SubmittedFormSummaryItem[]) => void;
+  resetLatestCollectionFormSubmissionState: () => void;
 
   // Session management
   createNewSession: (title?: string, spaceId?: string | null) => string;

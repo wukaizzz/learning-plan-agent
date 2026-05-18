@@ -4,6 +4,23 @@ import { immer } from 'zustand/middleware/immer';
 import type { ChatStore, Message, ChatSession, WorkspaceState, UIBlock } from '@/types'
 const generateId = () => `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
+const messageHasCollectionForm = (message: Message) =>
+  message.ui_blocks?.some(block => block.type === 'collection-form') ?? false;
+
+const updateSessionMessage = (
+  sessions: ChatSession[],
+  messageId: string,
+  updater: (message: Message) => void
+) => {
+  sessions.forEach(session => {
+    const sessionMessage = session.messages.find(msg => msg.id === messageId);
+    if (sessionMessage) {
+      updater(sessionMessage);
+      session.updatedAt = Date.now();
+    }
+  });
+};
+
 export const useChatStore = create<ChatStore>()(
   persist(
     immer((set, get) => ({
@@ -153,6 +170,79 @@ export const useChatStore = create<ChatStore>()(
             }
           }
         }
+      }),
+
+      addUIBlockToMessage: (messageId: string, block: UIBlock) => set((state) => {
+        const updater = (message: Message) => {
+          const existingBlocks = message.ui_blocks || [];
+          const nextBlocks = existingBlocks.filter(existing => existing.id !== block.id);
+          message.ui_blocks = [...nextBlocks, block];
+          message.form_submission_state = message.form_submission_state || 'idle';
+        };
+
+        const message = state.messages.find(msg => msg.id === messageId);
+        if (message) {
+          updater(message);
+        }
+
+        updateSessionMessage(state.sessions, messageId, updater);
+      }),
+
+      addUIBlockToLastAssistantMessage: (block: UIBlock) => set((state) => {
+        const lastMessage = [...state.messages].reverse().find(msg => msg.role === 'assistant');
+        if (!lastMessage) {
+          return;
+        }
+
+        const updater = (message: Message) => {
+          const existingBlocks = message.ui_blocks || [];
+          const nextBlocks = existingBlocks.filter(existing => existing.id !== block.id);
+          message.ui_blocks = [...nextBlocks, block];
+          message.form_submission_state = message.form_submission_state || 'idle';
+        };
+
+        updater(lastMessage);
+        updateSessionMessage(state.sessions, lastMessage.id, updater);
+      }),
+
+      markLatestCollectionFormSubmitting: () => set((state) => {
+        const message = [...state.messages].reverse().find(messageHasCollectionForm);
+        if (!message) {
+          return;
+        }
+
+        message.form_submission_state = 'submitting';
+        updateSessionMessage(state.sessions, message.id, sessionMessage => {
+          sessionMessage.form_submission_state = 'submitting';
+        });
+      }),
+
+      markLatestCollectionFormSubmitted: (summary) => set((state) => {
+        const message = [...state.messages].reverse().find(messageHasCollectionForm);
+        if (!message) {
+          return;
+        }
+
+        const updater = (targetMessage: Message) => {
+          targetMessage.form_submission_state = 'submitted';
+          targetMessage.submitted_form_summary = summary;
+          targetMessage.ui_blocks = targetMessage.ui_blocks?.filter(block => block.type !== 'collection-form') || [];
+        };
+
+        updater(message);
+        updateSessionMessage(state.sessions, message.id, updater);
+      }),
+
+      resetLatestCollectionFormSubmissionState: () => set((state) => {
+        const message = [...state.messages].reverse().find(messageHasCollectionForm);
+        if (!message) {
+          return;
+        }
+
+        message.form_submission_state = 'idle';
+        updateSessionMessage(state.sessions, message.id, sessionMessage => {
+          sessionMessage.form_submission_state = 'idle';
+        });
       }),
 
       // Session management

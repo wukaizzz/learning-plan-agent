@@ -10,7 +10,7 @@ export function useStream() {
   const { addAssistantMessage, setStreaming, 
   updateToolCall, updateLastAssistantMessage, appendWorkflowEvent } = useChat();
   const { getCurrentAgentConfig } = useAgent();
-  const { addUIBlock, clearUIBlocks, setWorkspaceState } = useChatStore();
+  const { addUIBlock, clearUIBlocks, setWorkspaceState, addUIBlockToLastAssistantMessage } = useChatStore();
   const currentMessageRef = useRef<string>('');
   const currentToolCallsRef = useRef<any[]>([]);
   const hasStartedStreaming = useRef<boolean>(false);
@@ -111,8 +111,27 @@ export function useStream() {
     console.log('🎨 UI Block update:', event);
 
     if (event.action === 'add' && event.block) {
+      if (event.block.type === 'collection-form') {
+        if (!hasStartedStreaming.current) {
+          const msg = addAssistantMessage(currentMessageRef.current, undefined, {
+            ui_blocks: [event.block],
+            form_submission_state: 'idle'
+          });
+          currentMessageIdRef.current = msg.id;
+          hasStartedStreaming.current = true;
+        } else {
+          addUIBlockToLastAssistantMessage(event.block);
+        }
+        return;
+      }
+
       addUIBlock(event.block);
     } else if (event.action === 'update' && event.block) {
+      if (event.block.type === 'collection-form') {
+        addUIBlockToLastAssistantMessage(event.block);
+        return;
+      }
+
       // 更新现有block（需要先删除再添加，或者直接修改）
       // 简化实现：直接添加新block
       addUIBlock(event.block);
@@ -120,7 +139,7 @@ export function useStream() {
       // 移除指定block（需要在chatStore中实现removeUIBlock方法）
       console.log('Remove block:', event.blockId);
     }
-  }, [addUIBlock]);
+  }, [addAssistantMessage, addUIBlock, addUIBlockToLastAssistantMessage]);
 
   // TODO 对话处理核心函数
   const streamResponse = useCallback(async (

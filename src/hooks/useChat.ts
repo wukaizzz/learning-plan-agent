@@ -30,13 +30,14 @@ export function useChat() {
     return message;
   }, [addMessage]);
 
-  const addAssistantMessage = useCallback((content: string, toolCalls?: ToolCall[]) => {
+  const addAssistantMessage = useCallback((content: string, toolCalls?: ToolCall[], extras?: Partial<Message>) => {
     const message: Message = {
       id: `msg-${Date.now()}`,
       role: 'assistant',
       content,
       timestamp: Date.now(),
       tool_calls: toolCalls,
+      ...extras,
       workflow_events: [] // 🆕 初始化空事件数组
     };
     addMessage(message);

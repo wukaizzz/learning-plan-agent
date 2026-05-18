@@ -93,7 +93,9 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
 
     // 添加新的 UI Blocks
     if (state.uiBlocks && state.uiBlocks.length > 0) {
-      const transformedBlocks = state.uiBlocks.map(transformUIBlock);
+      const transformedBlocks = state.uiBlocks
+        .map(transformUIBlock)
+        .filter(block => block.type !== 'collection-form');
 
       // 按 order 排序
       transformedBlocks.sort((a, b) => (a.props.order || 0) - (b.props.order || 0));

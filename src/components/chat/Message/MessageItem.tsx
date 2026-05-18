@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Message } from '../../../types/chat';
 import { formatTimestamp } from '../../../utils/messageFormatter';
+import { renderBlocks } from '../../../core/schema/componentRegistry.tsx';
 import { WorkflowEvents } from './WorkflowEvents'; // 🆕 导入
 // markdown支持
 import ReactMarkdown from 'react-markdown';
@@ -10,10 +11,13 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface MessageItemProps {
   message: Message;
+  onCollectionFormSubmit?: (data: Record<string, unknown>) => Promise<void>;
 }
 
-export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
+export const MessageItem: React.FC<MessageItemProps> = ({ message, onCollectionFormSubmit }) => {
   const isUser = message.role === 'user';
+  const embeddedBlocks = message.ui_blocks || [];
+  const hasSubmittedSummary = message.form_submission_state === 'submitted' && message.submitted_form_summary;
 
   return (
     <div className={`message-item ${isUser ? 'message-user' : 'message-assistant'}`}>
@@ -110,6 +114,32 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
             {message.content}
           </ReactMarkdown>
         </div>
+        {!isUser && hasSubmittedSummary && (
+          <div className="message-submitted-form-summary">
+            <div className="message-submitted-form-title">已提交信息</div>
+            <div className="message-submitted-form-items">
+              {message.submitted_form_summary?.map(item => (
+                <div className="message-submitted-form-item" key={item.label}>
+                  <span className="message-submitted-form-label">{item.label}</span>
+                  <span className="message-submitted-form-value">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!isUser && !hasSubmittedSummary && embeddedBlocks.length > 0 && onCollectionFormSubmit && (
+          <div className="message-embedded-blocks">
+            {renderBlocks(embeddedBlocks, {
+              onSubmit: onCollectionFormSubmit,
+              isLoading: message.form_submission_state === 'submitting',
+              stepIndex: 0,
+              totalSteps: embeddedBlocks.length,
+              showProgress: embeddedBlocks.length > 1
+            })}
+          </div>
+        )}
+
         {message.tool_calls && message.tool_calls.length > 0 && (
           <div className="message-tool-calls">
             {message.tool_calls.map((toolCall) => (
