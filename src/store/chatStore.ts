@@ -7,6 +7,9 @@ const generateId = () => `session_${Date.now()}_${Math.random().toString(36).sub
 const messageHasCollectionForm = (message: Message) =>
   message.ui_blocks?.some(block => block.type === 'collection-form') ?? false;
 
+const messageHasWorkflowProcess = (message: Message) =>
+  !!message.workflow_process_steps?.length;
+
 const updateSessionMessage = (
   sessions: ChatSession[],
   messageId: string,
@@ -234,7 +237,9 @@ export const useChatStore = create<ChatStore>()(
       }),
 
       resetLatestCollectionFormSubmissionState: () => set((state) => {
-        const message = [...state.messages].reverse().find(messageHasCollectionForm);
+        const message = [...state.messages].reverse().find(message =>
+          messageHasCollectionForm(message) || messageHasWorkflowProcess(message)
+        );
         if (!message) {
           return;
         }
@@ -243,6 +248,38 @@ export const useChatStore = create<ChatStore>()(
         updateSessionMessage(state.sessions, message.id, sessionMessage => {
           sessionMessage.form_submission_state = 'idle';
         });
+      }),
+
+      initializeLatestWorkflowProcessSteps: (steps) => set((state) => {
+        const message = [...state.messages].reverse().find(message =>
+          messageHasCollectionForm(message) || message.form_submission_state === 'submitted'
+        );
+        if (!message) {
+          return;
+        }
+
+        const updater = (targetMessage: Message) => {
+          targetMessage.workflow_process_steps = steps.map(step => ({ ...step }));
+        };
+
+        updater(message);
+        updateSessionMessage(state.sessions, message.id, updater);
+      }),
+
+      updateLatestWorkflowProcessStep: (stepId, status) => set((state) => {
+        const message = [...state.messages].reverse().find(messageHasWorkflowProcess);
+        if (!message) {
+          return;
+        }
+
+        const updater = (targetMessage: Message) => {
+          targetMessage.workflow_process_steps = targetMessage.workflow_process_steps?.map(step =>
+            step.id === stepId ? { ...step, status } : step
+          );
+        };
+
+        updater(message);
+        updateSessionMessage(state.sessions, message.id, updater);
       }),
 
       // Session management

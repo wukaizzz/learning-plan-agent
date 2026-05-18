@@ -12,6 +12,7 @@ export interface Message {
   ui_blocks?: UIBlock[];
   submitted_form_summary?: SubmittedFormSummaryItem[];
   form_submission_state?: 'idle' | 'submitting' | 'submitted';
+  workflow_process_steps?: WorkflowProcessStep[];
   workflow_events?: WorkflowEvent[]; // 🆕 该消息关联的工作流事件
 }
 
@@ -27,6 +28,12 @@ export interface ToolCall {
 export interface SubmittedFormSummaryItem {
   label: string;
   value: string;
+}
+
+export interface WorkflowProcessStep {
+  id: string;
+  label: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
 }
 
 export interface ChatSession {
@@ -70,6 +77,8 @@ export interface ChatStore {
   markLatestCollectionFormSubmitting: () => void;
   markLatestCollectionFormSubmitted: (summary: SubmittedFormSummaryItem[]) => void;
   resetLatestCollectionFormSubmissionState: () => void;
+  initializeLatestWorkflowProcessSteps: (steps: WorkflowProcessStep[]) => void;
+  updateLatestWorkflowProcessStep: (stepId: string, status: WorkflowProcessStep['status']) => void;
 
   // Session management
   createNewSession: (title?: string, spaceId?: string | null) => string;

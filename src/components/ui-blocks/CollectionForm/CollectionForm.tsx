@@ -135,6 +135,8 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
       }, {});
 
       await onSubmit(submitData);
+      console.log("collectionForm-submitData:", submitData)
+      console.log("collectionForm-fields:", fields)
       setIsSubmitted(true); // 🆕 标记为已提交
     } catch (error) {
       console.error('表单提交失败:', error);

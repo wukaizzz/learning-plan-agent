@@ -18,6 +18,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onCollectionF
   const isUser = message.role === 'user';
   const embeddedBlocks = message.ui_blocks || [];
   const hasSubmittedSummary = message.form_submission_state === 'submitted' && message.submitted_form_summary;
+  const processSteps = message.workflow_process_steps || []; // TODO processSteps
 
   return (
     <div className={`message-item ${isUser ? 'message-user' : 'message-assistant'}`}>
@@ -125,6 +126,21 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onCollectionF
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {!isUser && processSteps.length > 0 && (
+          <div className="message-workflow-process">
+            {processSteps.map(step => (
+              <div className={`message-workflow-process-step ${step.status}`} key={step.id}>
+                <span className="message-workflow-process-marker">
+                  {step.status === 'completed' && '✓'}
+                  {step.status === 'failed' && '!'}
+                  {step.status === 'running' && <span className="message-workflow-process-spinner" />}
+                </span>
+                <span className="message-workflow-process-label">{step.label}</span>
+              </div>
+            ))}
           </div>
         )}
 

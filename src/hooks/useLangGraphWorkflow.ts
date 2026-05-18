@@ -1,12 +1,12 @@
-/**
+﻿/**
  * useLangGraphWorkflow Hook
- * 封装 LangGraph 工作流的前端操作逻辑
+ * 灏佽 LangGraph 宸ヤ綔娴佺殑鍓嶇鎿嶄綔閫昏緫
  *
- * 功能：
- * - 调用后端工作流 API
- * - 处理工作流中断/恢复
- * - 将返回的 UI Blocks 更新到 chatStore
- * - 管理工作流状态
+ * 鍔熻兘锛?
+ * - 璋冪敤鍚庣宸ヤ綔娴?API
+ * - 澶勭悊宸ヤ綔娴佷腑鏂?鎭㈠
+ * - 灏嗚繑鍥炵殑 UI Blocks 鏇存柊鍒?chatStore
+ * - 绠＄悊宸ヤ綔娴佺姸鎬?
  */
 
 import { useState, useCallback, useRef } from 'react';
@@ -25,12 +25,12 @@ import {
 } from '@/services/workflowApi';
 
 export interface UseLangGraphWorkflowReturn {
-  // 状态
+  // 鐘舵€?
   isLoading: boolean;
   error: string | null;
   currentWorkflowState: WorkflowState | null;
 
-  // 操作方法
+  // 鎿嶄綔鏂规硶
   startWorkflow: (
     spaceId: string,
     initialState?: {
@@ -45,12 +45,18 @@ export interface UseLangGraphWorkflowReturn {
     userInput: Record<string, any>
   ) => Promise<WorkflowResponse>;
 
+  resumeWithoutApplying: (
+    threadId: string,
+    userInput: Record<string, any>
+  ) => Promise<WorkflowResponse>;
+
   replan: (
     spaceId: string,
     reason?: string
   ) => Promise<WorkflowResponse>;
 
-  // 工具方法
+  // 宸ュ叿鏂规硶
+  applyWorkflowResponse: (response: WorkflowResponse) => void;
   clearError: () => void;
   reset: () => void;
 }
@@ -69,9 +75,9 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   /**
-   * 处理工作流响应
+   * 澶勭悊宸ヤ綔娴佸搷搴?
    */
-  const handleWorkflowResponse = useCallback((response: WorkflowResponse): void => {
+  const applyWorkflowResponse = useCallback((response: WorkflowResponse): void => {
     if (!response.success || !response.state) {
       if (response.error) {
         setError(response.error);
@@ -81,23 +87,23 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
 
     const state = response.state;
 
-    // 更新当前工作流状态
+    // 鏇存柊褰撳墠宸ヤ綔娴佺姸鎬?
     setCurrentWorkflowState(state);
 
-    // 映射工作流阶段到前端状态
+    // 鏄犲皠宸ヤ綔娴侀樁娈靛埌鍓嶇鐘舵€?
     const frontendState = mapWorkflowStage(state.workflow.stage);
     setWorkspaceState(frontendState);
 
-    // 清空现有 UI Blocks
+    // 娓呯┖鐜版湁 UI Blocks
     clearUIBlocks();
 
-    // 添加新的 UI Blocks
+    // 娣诲姞鏂扮殑 UI Blocks
     if (state.uiBlocks && state.uiBlocks.length > 0) {
       const transformedBlocks = state.uiBlocks
         .map(transformUIBlock)
         .filter(block => block.type !== 'collection-form');
 
-      // 按 order 排序
+      // 鎸?order 鎺掑簭
       transformedBlocks.sort((a, b) => (a.props.order || 0) - (b.props.order || 0));
 
       transformedBlocks.forEach(block => {
@@ -105,7 +111,7 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
       });
     }
 
-    console.log('✅ 工作流响应处理完成:', {
+    console.log('鉁?宸ヤ綔娴佸搷搴斿鐞嗗畬鎴?', {
       stage: state.workflow.stage,
       uiBlocksCount: state.uiBlocks?.length || 0,
       interrupted: response.interrupted
@@ -113,7 +119,7 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
   }, [setWorkspaceState, clearUIBlocks, addUIBlock]);
 
   /**
-   * 启动工作流
+   * 鍚姩宸ヤ綔娴?
    */
   const startWorkflow = useCallback(async (
     spaceId: string,
@@ -123,7 +129,7 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
       availability?: Partial<AvailabilityInfo>;
     } = {}
   ): Promise<WorkflowResponse> => {
-    // 取消之前的请求
+    // 鍙栨秷涔嬪墠鐨勮姹?
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -133,20 +139,20 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
     setError(null);
 
     try {
-      console.log('🚀 启动工作流:', { spaceId, initialState });
+      console.log('馃殌 鍚姩宸ヤ綔娴?', { spaceId, initialState });
 
       const response = await startPlanning(spaceId, {
         userId: 'default-user',
         ...initialState
       });
 
-      handleWorkflowResponse(response);
+      applyWorkflowResponse(response);
 
       return response;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('❌ 启动工作流失败:', err);
+      console.error('鉂?鍚姩宸ヤ綔娴佸け璐?', err);
 
       return {
         success: false,
@@ -155,10 +161,10 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [handleWorkflowResponse]);
+  }, [applyWorkflowResponse]);
 
   /**
-   * 恢复中断的工作流
+   * 鎭㈠涓柇鐨勫伐浣滄祦
    */
   const resume = useCallback(async (
     threadId: string,
@@ -168,17 +174,17 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
     setError(null);
 
     try {
-      console.log('▶️ 恢复工作流:', { threadId, userInput });
+      console.log('鈻讹笍 鎭㈠宸ヤ綔娴?', { threadId, userInput });
 
       const response = await resumeWorkflow(threadId, userInput);
 
-      handleWorkflowResponse(response);
+      applyWorkflowResponse(response);
 
       return response;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('❌ 恢复工作流失败:', err);
+      console.error('鉂?鎭㈠宸ヤ綔娴佸け璐?', err);
 
       return {
         success: false,
@@ -187,10 +193,41 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [handleWorkflowResponse]);
+  }, [applyWorkflowResponse]);
+
+  const resumeWithoutApplying = useCallback(async (
+    threadId: string,
+    userInput: Record<string, any>
+  ): Promise<WorkflowResponse> => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log('鈻讹笍 鎭㈠宸ヤ綔娴?', { threadId, userInput });
+
+      const response = await resumeWorkflow(threadId, userInput);
+
+      if (!response.success && response.error) {
+        setError(response.error);
+      }
+
+      return response;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      console.error('鉂?鎭㈠宸ヤ綔娴佸け璐?', err);
+
+      return {
+        success: false,
+        error: errorMessage
+      };
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   /**
-   * 触发重规划
+   * 瑙﹀彂閲嶈鍒?
    */
   const replan = useCallback(async (
     spaceId: string,
@@ -200,19 +237,19 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
     setError(null);
 
     try {
-      console.log('🔄 触发重规划:', { spaceId, reason });
+      console.log('馃攧 瑙﹀彂閲嶈鍒?', { spaceId, reason });
 
       const response = await triggerReplan(spaceId, reason);
 
       if (response.success && response.state) {
-        handleWorkflowResponse(response);
+        applyWorkflowResponse(response);
       }
 
       return response;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('❌ 触发重规划失败:', err);
+      console.error('鉂?瑙﹀彂閲嶈鍒掑け璐?', err);
 
       return {
         success: false,
@@ -221,17 +258,17 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [handleWorkflowResponse]);
+  }, [applyWorkflowResponse]);
 
   /**
-   * 清除错误
+   * 娓呴櫎閿欒
    */
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
   /**
-   * 重置状态
+   * 閲嶇疆鐘舵€?
    */
   const reset = useCallback(() => {
     setIsLoading(false);
@@ -240,7 +277,7 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
   }, []);
 
   /**
-   * 组件卸载时取消请求
+   * 缁勪欢鍗歌浇鏃跺彇娑堣姹?
    */
   // useEffect(() => {
   //   return () => {
@@ -251,20 +288,24 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
   // }, []);
 
   return {
-    // 状态
+    // 鐘舵€?
     isLoading,
     error,
     currentWorkflowState,
 
-    // 操作方法
+    // 鎿嶄綔鏂规硶
     startWorkflow,
     resume,
+    resumeWithoutApplying,
     replan,
 
-    // 工具方法
+    // 宸ュ叿鏂规硶
+    applyWorkflowResponse,
     clearError,
     reset
   };
 };
 
 export default useLangGraphWorkflow;
+
+
