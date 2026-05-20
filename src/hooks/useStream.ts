@@ -4,7 +4,7 @@ import { useAgent } from './useAgent';
 import { useChatStore } from '../store/chatStore';
 import { API_ENDPOINT } from '../utils/constants';
 import type { Message } from '../types/chat';
-import type { WorkflowStepEvent, InfoNeededEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, UIBlockUpdateEvent } from '../types/workflowEvents';
+import type { WorkflowStepEvent, InfoNeededEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, UIBlockUpdateEvent, ThinkingEvent, ThinkingEndEvent } from '../types/workflowEvents';
 
 export function useStream() {
   const { addAssistantMessage, setStreaming, 
@@ -14,7 +14,9 @@ export function useStream() {
   const currentMessageRef = useRef<string>('');
   const currentToolCallsRef = useRef<any[]>([]);
   const hasStartedStreaming = useRef<boolean>(false);
-  const currentMessageIdRef = useRef<string | null>(null); // 🆕 跟踪当前消息ID
+  const currentMessageIdRef = useRef<string | null>(null);
+  const currentThinkingRef = useRef<string>('');
+  const isThinkingActive = useRef<boolean>(false);
 
   // 工作流事件处理函数
   const handleWorkflowStep = useCallback((event: WorkflowStepEvent) => {
@@ -70,6 +72,46 @@ export function useStream() {
         Object.assign(existingCall, toolCallData);
       }
     }
+  }, []);
+
+  const handleThinking = useCallback((event: ThinkingEvent) => {
+    if (!event.content && event.content !== '') return;
+    currentThinkingRef.current += event.content;
+    isThinkingActive.current = true;
+
+    const store = useChatStore.getState();
+    const lastMsg = [...store.messages].reverse().find(m => m.role === 'assistant');
+    if (lastMsg) {
+      useChatStore.getState().addUIBlockToLastAssistantMessage({
+        id: `thinking_block_${lastMsg.id}`,
+        type: 'thinking-block' as any,
+        title: '思考过程',
+        props: {
+          _thinkingContent: currentThinkingRef.current,
+          _thinkingActive: true,
+        } as any,
+      });
+    }
+  }, []);
+
+  const handleThinkingEnd = useCallback((event: ThinkingEndEvent) => {
+    isThinkingActive.current = false;
+
+    const store = useChatStore.getState();
+    const lastMsg = [...store.messages].reverse().find(m => m.role === 'assistant');
+    if (lastMsg) {
+      useChatStore.getState().addUIBlockToLastAssistantMessage({
+        id: `thinking_block_${lastMsg.id}`,
+        type: 'thinking-block' as any,
+        title: '思考过程',
+        props: {
+          _thinkingContent: currentThinkingRef.current,
+          _thinkingActive: false,
+          _thinkingDuration: event.duration,
+        } as any,
+      });
+    }
+    currentThinkingRef.current = '';
   }, []);
 
   const handleProcessing = useCallback((event: ProcessingEvent) => {
@@ -153,6 +195,8 @@ export function useStream() {
 
     currentMessageRef.current = '';
     currentToolCallsRef.current = [];
+    currentThinkingRef.current = '';
+    isThinkingActive.current = false;
     hasStartedStreaming.current = false;
     setStreaming(true);
     
@@ -249,9 +293,18 @@ export function useStream() {
                   break;
 
                 case 'ui_block_update':
-                  // 🆕 处理UI Block更新事件
                   handleUIBlockUpdate(chunk);
-                  appendWorkflowEvent(chunk); // 🆕 添加事件
+                  appendWorkflowEvent(chunk);
+                  break;
+
+                case 'thinking':
+                  handleThinking(chunk);
+                  appendWorkflowEvent(chunk);
+                  break;
+
+                case 'thinking_end':
+                  handleThinkingEnd(chunk);
+                  appendWorkflowEvent(chunk);
                   break;
 
                 case 'error':

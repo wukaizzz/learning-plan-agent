@@ -1,0 +1,116 @@
+.thinking-block {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin: 8px 0;
+  overflow: hidden;
+  font-size: 14px;
+  background: #f8fafc;
+  transition: border-color 0.3s ease;
+}
+
+.thinking-block-active {
+  border-color: #818cf8;
+  background: #f5f3ff;
+}
+
+.thinking-block-done {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.thinking-block-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: #6b7280;
+  text-align: left;
+}
+
+.thinking-block-header:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.thinking-block-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.thinking-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #c7d2fe;
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: thinking-spin 0.8s linear infinite;
+}
+
+@keyframes thinking-spin {
+  to { transform: rotate(360deg); }
+}
+
+.thinking-check {
+  color: #10b981;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.thinking-block-title {
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.thinking-block-duration {
+  color: #9ca3af;
+  font-size: 12px;
+  margin-left: auto;
+}
+
+.thinking-block-toggle {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+  color: #9ca3af;
+}
+
+.thinking-block-toggle.expanded {
+  transform: rotate(180deg);
+}
+
+.thinking-block-content {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0 14px 12px 14px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.thinking-block-text {
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #6b7280;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  padding: 8px 0 0 0;
+  font-style: italic;
+}
+
+.thinking-cursor {
+  color: #818cf8;
+  font-style: normal;
+  animation: thinking-blink 1s step-end infinite;
+}
+
+@keyframes thinking-blink {
+  50% { opacity: 0; }
+}

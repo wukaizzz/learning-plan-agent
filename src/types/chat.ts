@@ -13,7 +13,9 @@ export interface Message {
   submitted_form_summary?: SubmittedFormSummaryItem[];
   form_submission_state?: 'idle' | 'submitting' | 'submitted';
   workflow_process_steps?: WorkflowProcessStep[];
-  workflow_events?: WorkflowEvent[]; // 🆕 该消息关联的工作流事件
+  workflow_events?: WorkflowEvent[];
+  thinkingContent?: string;
+  thinkingDuration?: number;
 }
 
 export interface ToolCall {

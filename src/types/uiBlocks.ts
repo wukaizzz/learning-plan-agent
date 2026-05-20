@@ -332,16 +332,17 @@ export interface UIBlock {
  * 支持的UI Block类型
  */
 export type BlockType =
-  | 'summary-card'       // 学习概况卡片 - 显示空间基本信息、进度、目标等
-  | 'daily-task-list'    // 每日任务列表 - 显示当天的学习任务
-  | 'study-timeline'     // 学习时间轴 - 显示学习计划时间线
-  | 'progress-bar'       // 进度条 - 显示整体或单项进度
-  | 'risk-alert'         // 风险警告 - 显示学习风险和建议
-  | 'action-bar'         // 操作栏 - 显示用户可执行的操作按钮
-  | 'tool-call-status'   // 工具调用状态 - 显示Agent工具调用过程
-  | 'collection-form'    // 信息收集表单 - 收集用户学习信息
-  | 'generating-skeleton' // 生成中骨架屏 - 显示生成动画和进度
-  | 'workflow-indicator'; // 工作流指示器 - 显示当前阶段和进度
+  | 'summary-card'
+  | 'daily-task-list'
+  | 'study-timeline'
+  | 'progress-bar'
+  | 'risk-alert'
+  | 'action-bar'
+  | 'tool-call-status'
+  | 'collection-form'
+  | 'generating-skeleton'
+  | 'workflow-indicator'
+  | 'thinking-block';
 
 // ============= 各Block类型的特定Props定义 =============
 

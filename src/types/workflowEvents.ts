@@ -5,11 +5,23 @@
 
 import type { UIBlock } from './uiBlocks';
 
+// 思考过程事件（R1 reasoning_content 或模拟思考）
+export interface ThinkingEvent {
+  type: 'thinking';
+  content: string;
+}
+
+// 思考结束事件
+export interface ThinkingEndEvent {
+  type: 'thinking_end';
+  duration: number;
+}
+
 // 工作流步骤事件
 export interface WorkflowStepEvent {
   type: 'workflow_step';
   step: 'collecting' | 'analyzing' | 'generating' | 'reviewing' | 'finalized' | 'paused';
-  message: string;
+  message?: string;
   progress?: number; // 0-100
 }
 
@@ -65,9 +77,11 @@ export type WorkflowEvent =
   | UIBlockUpdateEvent
   | ProcessingEvent
   | AnalysisResultEvent
-  | { type: 'content'; content: string } // 原有的内容事件
-  | { type: 'done' } // 完成事件
-  | { type: 'error'; error: string }; // 错误事件
+  | ThinkingEvent
+  | ThinkingEndEvent
+  | { type: 'content'; content: string }
+  | { type: 'done' }
+  | { type: 'error'; error: string };
 
 // 后端SSE响应格式
 export interface SSEChunk {
