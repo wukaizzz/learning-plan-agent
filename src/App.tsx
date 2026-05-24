@@ -8,6 +8,6 @@ function App() {
       <RouterProvider router={router}></RouterProvider>
     </div>
   );
-}1
+}
 
 export default App;
