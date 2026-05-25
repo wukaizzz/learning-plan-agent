@@ -21,11 +21,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  width: 100%;
   padding: 12px 16px;
   cursor: pointer;
   user-select: none;
+  border: none;
   background: rgba(102, 126, 234, 0.03);
   transition: background 0.2s ease;
+  text-align: left;
 }
 
 .workflow-events-header:hover {
@@ -41,8 +44,22 @@
   color: #4b5563;
 }
 
-.workflow-events-icon {
-  font-size: 16px;
+.workflow-events-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+}
+
+.workflow-events-status-dot.running {
+  background: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.16);
+  animation: pulse 1.4s infinite ease-in-out both;
+}
+
+.workflow-events-status-dot.done {
+  background: #22c55e;
 }
 
 .workflow-events-count {
@@ -95,7 +112,28 @@
 }
 
 .workflow-event-icon {
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #667eea;
+  font-weight: 700;
+}
+
+.workflow-event-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #c7d2fe;
+  border-top-color: #667eea;
+  border-radius: 999px;
+  animation: workflow-spin 0.8s linear infinite;
+}
+
+@keyframes workflow-spin {
+  to { transform: rotate(360deg); }
 }
 
 .workflow-event-title {
@@ -111,7 +149,7 @@
 }
 
 .workflow-event-details {
-  padding: 12px;
+  padding: 0 12px 12px 38px;
   font-size: 13px;
   line-height: 1.6;
 }
@@ -119,6 +157,27 @@
 .workflow-event-message {
   color: #4b5563;
   margin-bottom: 8px;
+}
+
+.workflow-event-stream-text {
+  margin: 8px 0 0;
+  padding: 8px 0 0;
+  color: #6b7280;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-top: 1px solid #eef2ff;
+}
+
+.workflow-event-cursor {
+  color: #667eea;
+  animation: workflow-cursor-blink 1s step-end infinite;
+}
+
+@keyframes workflow-cursor-blink {
+  50% { opacity: 0; }
 }
 
 .workflow-event-message.error {
@@ -292,6 +351,22 @@
 
 .workflow-event-item.info_needed {
   border-left-color: #f59e0b;
+}
+
+.workflow-event-item.completed .workflow-event-icon {
+  color: #16a34a;
+}
+
+.workflow-event-item.running {
+  border-color: #a5b4fc;
+}
+
+.workflow-event-item.pending {
+  border-color: #fbbf24;
+}
+
+.workflow-event-item.failed {
+  border-color: #f87171;
 }
 
 /* 响应式 */

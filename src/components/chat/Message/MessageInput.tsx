@@ -27,8 +27,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [currentDraft, setCurrentDraft] = useState('');
 
   // 防抖保存草稿到Store的引用
-  const saveDraftTimerRef = useRef<number | null>(null);
-  const resizeTimerRef = useRef<number | null>(null);
+  const saveDraftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 防抖保存草稿到Store
   const debouncedSaveDraft = useCallback((draft: string) => {

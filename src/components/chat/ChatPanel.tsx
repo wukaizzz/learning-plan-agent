@@ -9,7 +9,7 @@ import { useChat, useStream, useAgent, useWorkflow } from '@/hooks';
 import { useLangGraphWorkflow } from '@/hooks/useLangGraphWorkflow';
 import { useChatStore, useSpaceStore } from '@/store';
 import type { Message, WorkflowProcessStep } from '@/types';
-
+import { logger } from '@/logger';
 import './ChatPanel.css';
 
 const PROCESS_STEP_DELAY_MS = 650;
@@ -231,7 +231,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
       ...messages,
       userMessage
     ];
-
+    logger.info(
+      { 
+        messages: messagesForApi, 
+        position: "chanPanel" 
+      }, 
+      'chanPanel sendMessage'
+    );
     try {
       await streamResponse(messagesForApi, 'deepseek');
     } catch (error) {

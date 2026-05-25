@@ -4,13 +4,13 @@ import { useAgent } from './useAgent';
 import { useChatStore } from '../store/chatStore';
 import { API_ENDPOINT } from '../utils/constants';
 import type { Message } from '../types/chat';
-import type { WorkflowStepEvent, InfoNeededEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, UIBlockUpdateEvent, ThinkingEvent, ThinkingEndEvent } from '../types/workflowEvents';
+import type { WorkflowStepEvent, InfoNeededEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, UIBlockUpdateEvent, ThinkingEvent, ThinkingEndEvent, IntentRoutedEvent } from '../types/workflowEvents';
 
 export function useStream() {
   const { addAssistantMessage, setStreaming, 
   updateToolCall, updateLastAssistantMessage, appendWorkflowEvent } = useChat();
   const { getCurrentAgentConfig } = useAgent();
-  const { addUIBlock, clearUIBlocks, setWorkspaceState, addUIBlockToLastAssistantMessage } = useChatStore();
+  const { addUIBlock, clearUIBlocks, setWorkspaceState, addUIBlockToLastAssistantMessage, currentSpaceId } = useChatStore();
   const currentMessageRef = useRef<string>('');
   const currentToolCallsRef = useRef<any[]>([]);
   const hasStartedStreaming = useRef<boolean>(false);
@@ -78,39 +78,10 @@ export function useStream() {
     if (!event.content && event.content !== '') return;
     currentThinkingRef.current += event.content;
     isThinkingActive.current = true;
-
-    const store = useChatStore.getState();
-    const lastMsg = [...store.messages].reverse().find(m => m.role === 'assistant');
-    if (lastMsg) {
-      useChatStore.getState().addUIBlockToLastAssistantMessage({
-        id: `thinking_block_${lastMsg.id}`,
-        type: 'thinking-block' as any,
-        title: '思考过程',
-        props: {
-          _thinkingContent: currentThinkingRef.current,
-          _thinkingActive: true,
-        } as any,
-      });
-    }
   }, []);
 
-  const handleThinkingEnd = useCallback((event: ThinkingEndEvent) => {
+  const handleThinkingEnd = useCallback((_event: ThinkingEndEvent) => {
     isThinkingActive.current = false;
-
-    const store = useChatStore.getState();
-    const lastMsg = [...store.messages].reverse().find(m => m.role === 'assistant');
-    if (lastMsg) {
-      useChatStore.getState().addUIBlockToLastAssistantMessage({
-        id: `thinking_block_${lastMsg.id}`,
-        type: 'thinking-block' as any,
-        title: '思考过程',
-        props: {
-          _thinkingContent: currentThinkingRef.current,
-          _thinkingActive: false,
-          _thinkingDuration: event.duration,
-        } as any,
-      });
-    }
     currentThinkingRef.current = '';
   }, []);
 
@@ -120,6 +91,10 @@ export function useStream() {
     if (event.progress !== undefined) {
       console.log(`Processing progress: ${event.progress}%`);
     }
+  }, []);
+
+  const handleIntentRouted = useCallback((event: IntentRoutedEvent) => {
+    console.log('🧭 Intent routed:', event);
   }, []);
 
   const handleAnalysisResult = useCallback((event: AnalysisResultEvent) => {
@@ -183,6 +158,16 @@ export function useStream() {
     }
   }, [addAssistantMessage, addUIBlock, addUIBlockToLastAssistantMessage]);
 
+  const ensureAssistantMessage = useCallback(() => {
+    if (hasStartedStreaming.current) {
+      return;
+    }
+
+    const msg = addAssistantMessage(currentMessageRef.current, currentToolCallsRef.current);
+    currentMessageIdRef.current = msg.id;
+    hasStartedStreaming.current = true;
+  }, [addAssistantMessage]);
+
   // TODO 对话处理核心函数
   const streamResponse = useCallback(async (
     messages: Message[],
@@ -209,7 +194,8 @@ export function useStream() {
         },
         body: JSON.stringify({
           messages,
-          agentConfig
+          agentConfig,
+          studySpaceId: currentSpaceId
         })
       });
       console.log(JSON.stringify((messages)));
@@ -264,30 +250,42 @@ export function useStream() {
 
                 case 'workflow_step':
                   // 处理工作流步骤事件
+                  ensureAssistantMessage();
                   handleWorkflowStep(chunk);
                   appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'info_needed':
                   // 处理信息收集事件
+                  ensureAssistantMessage();
                   handleInfoNeeded(chunk);
                   appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'tool_call':
                   // 处理工具调用事件
+                  ensureAssistantMessage();
                   handleToolCall(chunk);
                   appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'processing':
                   // 处理处理进度事件
+                  ensureAssistantMessage();
                   handleProcessing(chunk);
                   appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
+                case 'intent_routed':
+                  // 处理最终意图路由事件
+                  ensureAssistantMessage();
+                  handleIntentRouted(chunk);
+                  appendWorkflowEvent(chunk);
+                  break;
+
                 case 'analysis_result':
                   // 处理分析结果事件
+                  ensureAssistantMessage();
                   handleAnalysisResult(chunk);
                   appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
@@ -298,11 +296,13 @@ export function useStream() {
                   break;
 
                 case 'thinking':
+                  ensureAssistantMessage();
                   handleThinking(chunk);
                   appendWorkflowEvent(chunk);
                   break;
 
                 case 'thinking_end':
+                  ensureAssistantMessage();
                   handleThinkingEnd(chunk);
                   appendWorkflowEvent(chunk);
                   break;
@@ -345,7 +345,7 @@ export function useStream() {
       setStreaming(false);
       currentMessageIdRef.current = null; // 🆕 清空消息ID
     }
-  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, appendWorkflowEvent]); // 🆕 添加依赖
+  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, appendWorkflowEvent, currentSpaceId, ensureAssistantMessage, handleIntentRouted]); // 🆕 添加依赖
 
   const executeTool = useCallback(async (
     toolCallId: string,

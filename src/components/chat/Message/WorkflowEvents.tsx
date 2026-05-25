@@ -1,17 +1,22 @@
 /**
- * WorkflowEvents Component
- * 消息内联的工作流事件展示组件
+ * User-facing Agent progress stream.
  *
- * 功能：
- * - 在消息内容上方显示工作流事件
- * - 简化的卡片样式
- * - 支持展开/折叠
+ * Converts raw SSE events into readable steps. Internal event names stay in the
+ * data layer; users see what the Agent is currently doing.
  */
 
-import React, { useState, useEffect } from 'react';
-import type { WorkflowEvent, WorkflowStepEvent, 
-  ToolCallEvent, ProcessingEvent, 
-  AnalysisResultEvent, InfoNeededEvent } from '@/types/workflowEvents';
+import React, { useEffect, useMemo, useState } from 'react';
+import type {
+  AnalysisResultEvent,
+  InfoNeededEvent,
+  IntentRoutedEvent,
+  ProcessingEvent,
+  ThinkingEvent,
+  ToolCallEvent,
+  UIBlockUpdateEvent,
+  WorkflowEvent,
+  WorkflowStepEvent
+} from '@/types/workflowEvents';
 import './WorkflowEvents.css';
 
 interface WorkflowEventsProps {
@@ -19,260 +24,337 @@ interface WorkflowEventsProps {
   isStreaming?: boolean;
 }
 
+type StepStatus = 'running' | 'completed' | 'pending' | 'failed';
+
+interface AgentProgressStep {
+  id: string;
+  title: string;
+  detail?: string;
+  progress?: number;
+  status: StepStatus;
+  type: string;
+  streamText?: string;
+  result?: unknown;
+}
+
+const WORKFLOW_STEP_LABELS: Record<string, string> = {
+  collecting: '检查学习计划所需信息',
+  analyzing: '分析目标和时间压力',
+  generating: '生成学习任务和计划结构',
+  reviewing: '整理计划展示',
+  finalized: '学习计划已生成',
+  paused: '等待补充信息'
+};
+
+const PROCESSING_LABELS: Record<string, string> = {
+  intent_detection: '思考用户意图',
+  intent_classification: '形成路由决策',
+  rule_fallback: '使用规则兜底确认'
+};
+
+const TOOL_LABELS: Record<string, string> = {
+  calculator: '计算工具',
+  weather: '天气工具',
+  web_search: '搜索工具'
+};
+
+function getFieldLabel(event: InfoNeededEvent & { field?: string; fieldLabel?: string }) {
+  const field = event.fieldLabel || event.fieldName || event.field || '';
+  const labels: Record<string, string> = {
+    'goal.examDate': '考试日期',
+    examDate: '考试日期',
+    'goal.targetScore': '目标分数',
+    targetScore: '目标分数',
+    subjects: '考试科目',
+    'availability.dailyHours': '每日学习时间',
+    dailyHours: '每日学习时间'
+  };
+
+  return labels[field] || field || '必要信息';
+}
+
+function upsertStep(steps: AgentProgressStep[], next: AgentProgressStep) {
+  const index = steps.findIndex(step => step.id === next.id);
+  if (index === -1) {
+    steps.push(next);
+    return;
+  }
+
+  steps[index] = {
+    ...steps[index],
+    ...next,
+    streamText: next.streamText ?? steps[index].streamText
+  };
+}
+
+function completePreviousRunningSteps(steps: AgentProgressStep[], activeStepId: string) {
+  steps.forEach(step => {
+    if (step.id !== activeStepId && step.status === 'running') {
+      step.status = 'completed';
+    }
+  });
+}
+
+function createProcessSteps(events: WorkflowEvent[]): AgentProgressStep[] {
+  const steps: AgentProgressStep[] = [];
+  let activeStepId: string | null = null;
+
+  for (const event of events) {
+    switch (event.type) {
+      case 'processing': {
+        const processing = event as ProcessingEvent;
+        const id = `processing:${processing.stage}`;
+        activeStepId = id;
+        completePreviousRunningSteps(steps, id);
+        upsertStep(steps, {
+          id,
+          type: 'processing',
+          title: PROCESSING_LABELS[processing.stage] || '处理请求',
+          detail: processing.details,
+          progress: processing.progress,
+          status: 'running'
+        });
+        break;
+      }
+
+      case 'intent_routed': {
+        const routed = event as IntentRoutedEvent;
+        const id = 'intent:routed';
+        activeStepId = id;
+        completePreviousRunningSteps(steps, id);
+        upsertStep(steps, {
+          id,
+          type: 'intent_routed',
+          title: '选择处理流程',
+          detail: routed.payload.message,
+          status: 'completed'
+        });
+        break;
+      }
+
+      case 'workflow_step': {
+        const workflowStep = event as WorkflowStepEvent;
+        const id = `workflow:${workflowStep.step}`;
+        activeStepId = id;
+        completePreviousRunningSteps(steps, id);
+        upsertStep(steps, {
+          id,
+          type: 'workflow_step',
+          title: WORKFLOW_STEP_LABELS[workflowStep.step] || '推进学习计划流程',
+          detail: workflowStep.message,
+          progress: workflowStep.progress,
+          status: workflowStep.step === 'finalized' ? 'completed' : 'running'
+        });
+        break;
+      }
+
+      case 'ui_block_update': {
+        const uiBlock = event as UIBlockUpdateEvent;
+        if (uiBlock.action !== 'add' || uiBlock.block?.type !== 'collection-form') {
+          break;
+        }
+        const id = 'ui:collection-form';
+        activeStepId = id;
+        completePreviousRunningSteps(steps, id);
+        upsertStep(steps, {
+          id,
+          type: 'ui_block_update',
+          title: '准备信息收集表单',
+          detail: '我已经整理好需要你补充的信息。',
+          status: 'completed'
+        });
+        break;
+      }
+
+      case 'info_needed': {
+        const infoNeeded = event as InfoNeededEvent & { field?: string; fieldLabel?: string };
+        const label = getFieldLabel(infoNeeded);
+        const id = `info_needed:${infoNeeded.fieldName || infoNeeded.field || label}`;
+        activeStepId = id;
+        completePreviousRunningSteps(steps, id);
+        upsertStep(steps, {
+          id,
+          type: 'info_needed',
+          title: `需要补充${label}`,
+          detail: infoNeeded.question,
+          status: 'pending'
+        });
+        break;
+      }
+
+      case 'tool_call': {
+        const toolCall = event as ToolCallEvent & { id?: string; reason?: string; message?: string };
+        const id = `tool:${toolCall.id || toolCall.toolName}`;
+        activeStepId = id;
+        completePreviousRunningSteps(steps, id);
+        const toolLabel = TOOL_LABELS[toolCall.toolName] || toolCall.toolName;
+        const status: StepStatus =
+          toolCall.status === 'failed' ? 'failed' :
+          toolCall.status === 'completed' ? 'completed' :
+          'running';
+        upsertStep(steps, {
+          id,
+          type: 'tool_call',
+          title: status === 'completed' ? `${toolLabel}调用完成` : `正在调用${toolLabel}`,
+          detail: toolCall.message || toolCall.reason,
+          status,
+          result: toolCall.result || toolCall.error
+        });
+        break;
+      }
+
+      case 'thinking': {
+        if (!activeStepId) {
+          activeStepId = 'processing:thinking';
+          upsertStep(steps, {
+            id: activeStepId,
+            type: 'thinking',
+            title: '思考处理方式',
+            status: 'running'
+          });
+        }
+        const thinking = event as ThinkingEvent;
+        const activeStep = steps.find(step => step.id === activeStepId);
+        if (activeStep && thinking.content) {
+          activeStep.streamText = `${activeStep.streamText || ''}${thinking.content}`;
+        }
+        break;
+      }
+
+      case 'thinking_end': {
+        if (activeStepId) {
+          const activeStep = steps.find(step => step.id === activeStepId);
+          if (activeStep && activeStep.status === 'running') {
+            activeStep.status = 'completed';
+          }
+        }
+        break;
+      }
+
+      case 'analysis_result': {
+        const analysis = event as AnalysisResultEvent;
+        const id = 'analysis:result';
+        activeStepId = id;
+        completePreviousRunningSteps(steps, id);
+        upsertStep(steps, {
+          id,
+          type: 'analysis_result',
+          title: '整理分析结果',
+          detail: analysis.summary,
+          status: 'completed',
+          result: {
+            findings: analysis.findings,
+            recommendations: analysis.recommendations
+          }
+        });
+        break;
+      }
+
+      case 'error': {
+        const id = 'error';
+        activeStepId = id;
+        completePreviousRunningSteps(steps, id);
+        upsertStep(steps, {
+          id,
+          type: 'error',
+          title: '处理遇到问题',
+          detail: (event as any).error,
+          status: 'failed'
+        });
+        break;
+      }
+
+      case 'content':
+      case 'done':
+        break;
+    }
+  }
+
+  return steps;
+}
+
 export const WorkflowEvents: React.FC<WorkflowEventsProps> = ({
   events,
   isStreaming = false
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+  const [isExpanded, setIsExpanded] = useState(true);
+  const steps = useMemo(() => createProcessSteps(events), [events]);
 
-  // 🆕 流式传输时自动展开
   useEffect(() => {
-    if (isStreaming && events.length > 0) {
+    if (isStreaming && steps.length > 0) {
       setIsExpanded(true);
     }
-  }, [isStreaming, events.length]);
+  }, [isStreaming, steps.length]);
 
-  // 🆕 自动展开最新的步骤
-  useEffect(() => {
-    if (events.length > 0) {
-      const lastStepIndex = events.length - 1;
-      setExpandedSteps(prev => new Set([...prev, `event-${lastStepIndex}`]));
-    }
-  }, [events.length]);
-
-  if (events.length === 0) {
+  if (steps.length === 0) {
     return null;
   }
 
+  const hasRunningStep = steps.some(step => step.status === 'running');
+  const completedCount = steps.filter(step => step.status === 'completed').length;
+
   return (
     <div className={`workflow-events ${isExpanded ? 'expanded' : 'collapsed'}`}>
-      <div
+      <button
         className="workflow-events-header"
         onClick={() => setIsExpanded(!isExpanded)}
+        type="button"
       >
         <span className="workflow-events-title">
-          <span className="workflow-events-icon">💭</span>
-          思考过程
+          <span className={`workflow-events-status-dot ${hasRunningStep ? 'running' : 'done'}`} />
+          <span>{hasRunningStep ? 'Agent 正在处理' : 'Agent 处理过程'}</span>
           <span className="workflow-events-count">
-            {events.length} 个步骤
+            {completedCount}/{steps.length}
           </span>
         </span>
         <span className={`workflow-events-toggle ${isExpanded ? 'open' : 'closed'}`}>
-          {isExpanded ? '▼' : '▶'}
+          ▾
         </span>
-      </div>
+      </button>
 
       {isExpanded && (
         <div className="workflow-events-content">
-          {events.map((event, index) => (
-            <WorkflowEventItem
-              key={`event-${index}`}
-              event={event}
-              isExpanded={expandedSteps.has(`event-${index}`)}
-              onToggle={() => {
-                setExpandedSteps(prev => {
-                  const newSet = new Set(prev);
-                  if (newSet.has(`event-${index}`)) {
-                    newSet.delete(`event-${index}`);
-                  } else {
-                    newSet.add(`event-${index}`);
-                  }
-                  return newSet;
-                });
-              }}
-            />
+          {steps.map(step => (
+            <AgentProgressStepItem key={step.id} step={step} />
           ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
-          {isStreaming && (
-            <div className="workflow-events-streaming">
-              <span className="streaming-dot" />
-              <span className="streaming-dot" />
-              <span className="streaming-dot" />
-            </div>
+const AgentProgressStepItem: React.FC<{ step: AgentProgressStep }> = ({ step }) => {
+  return (
+    <div className={`workflow-event-item ${step.type} ${step.status}`}>
+      <div className="workflow-event-header">
+        <span className="workflow-event-icon">
+          {step.status === 'completed' && '✓'}
+          {step.status === 'running' && <span className="workflow-event-spinner" />}
+          {step.status === 'pending' && '?'}
+          {step.status === 'failed' && '!'}
+        </span>
+        <span className="workflow-event-title">{step.title}</span>
+      </div>
+
+      {(step.detail || step.streamText || step.result !== undefined) && (
+        <div className="workflow-event-details">
+          {step.detail && <div className="workflow-event-message">{step.detail}</div>}
+          {step.streamText && (
+            <pre className="workflow-event-stream-text">
+              {step.streamText}
+              {step.status === 'running' && <span className="workflow-event-cursor">▍</span>}
+            </pre>
+          )}
+          {step.result !== undefined && (
+            <details className="workflow-event-result">
+              <summary className="workflow-event-result-label">查看结果</summary>
+              <pre className="workflow-event-result-value">
+                {JSON.stringify(step.result, null, 2)}
+              </pre>
+            </details>
           )}
         </div>
       )}
     </div>
   );
 };
-
-interface WorkflowEventItemProps {
-  event: WorkflowEvent;
-  isExpanded: boolean;
-  onToggle: () => void;
-}
-
-const WorkflowEventItem: React.FC<WorkflowEventItemProps> = ({
-  event,
-  isExpanded,
-  onToggle
-}) => {
-  const getEventIcon = () => {
-    switch (event.type) {
-      case 'workflow_step': return '🔄';
-      case 'tool_call': return '🔧';
-      case 'processing': return '⚙️';
-      case 'analysis_result': return '📊';
-      case 'info_needed': return '❓';
-      default: return '📝';
-    }
-  };
-
-  const getEventTitle = () => {
-    switch (event.type) {
-      case 'workflow_step': return (event as WorkflowStepEvent).step || '工作流步骤';
-      case 'tool_call': return `工具调用: ${(event as ToolCallEvent).toolName}`;
-      case 'processing': return (event as ProcessingEvent).stage || '处理中';
-      case 'analysis_result': return (event as AnalysisResultEvent).summary || '分析结果';
-      case 'info_needed': return `需要信息: ${(event as InfoNeededEvent).fieldName}`;
-      default: return '未知事件';
-    }
-  };
-
-  return (
-    <div
-      className={`workflow-event-item ${event.type} ${isExpanded ? 'expanded' : 'collapsed'}`}
-      onClick={onToggle}
-    >
-      <div className="workflow-event-header">
-        <span className="workflow-event-icon">{getEventIcon()}</span>
-        <span className="workflow-event-title">{getEventTitle()}</span>
-        <span className="workflow-event-toggle">
-          {isExpanded ? '▼' : '▶'}
-        </span>
-      </div>
-
-      {isExpanded && (
-        <div className="workflow-event-details">
-          {event.type === 'workflow_step' && renderWorkflowStep(event as WorkflowStepEvent)}
-          {event.type === 'tool_call' && renderToolCall(event as ToolCallEvent)}
-          {event.type === 'processing' && renderProcessing(event as ProcessingEvent)}
-          {event.type === 'analysis_result' && renderAnalysisResult(event as AnalysisResultEvent)}
-          {event.type === 'info_needed' && renderInfoNeeded(event as InfoNeededEvent)}
-          {event.type === 'content' && <div className="workflow-event-message">{(event as any).content}</div>}
-          {event.type === 'done' && <div className="workflow-event-message">完成</div>}
-          {event.type === 'error' && <div className="workflow-event-message error">错误: {(event as any).error}</div>}
-        </div>
-      )}
-    </div>
-  );
-};
-
-function renderWorkflowStep(event: WorkflowStepEvent) {
-  return (
-    <>
-      <div className="workflow-event-message">{event.message}</div>
-      {event.progress !== undefined && (
-        <div className="workflow-event-progress">
-          <div
-            className="workflow-event-progress-bar"
-            style={{ width: `${event.progress}%` }}
-          />
-          <span className="workflow-event-progress-text">{event.progress}%</span>
-        </div>
-      )}
-    </>
-  );
-}
-
-function renderToolCall(event: ToolCallEvent) {
-  return (
-    <>
-      <div className="workflow-event-status">状态: {event.status}</div>
-      {event.parameters && (
-        <pre className="workflow-event-params">
-          {JSON.stringify(event.parameters, null, 2)}
-        </pre>
-      )}
-      {event.result && (
-        <div className="workflow-event-result">
-          <div className="workflow-event-result-label">结果:</div>
-          <pre className="workflow-event-result-value">
-            {JSON.stringify(event.result, null, 2)}
-          </pre>
-        </div>
-      )}
-      {event.error && (
-        <div className="workflow-event-error">
-          <div className="workflow-event-error-label">错误:</div>
-          <div className="workflow-event-error-message">{event.error}</div>
-        </div>
-      )}
-    </>
-  );
-}
-
-function renderProcessing(event: ProcessingEvent) {
-  return (
-    <>
-      <div className="workflow-event-stage">{event.stage}</div>
-      {event.details && (
-        <div className="workflow-event-details-text">{event.details}</div>
-      )}
-      {event.progress !== undefined && (
-        <div className="workflow-event-progress">
-          <div
-            className="workflow-event-progress-bar"
-            style={{ width: `${event.progress}%` }}
-          />
-          <span className="workflow-event-progress-text">{event.progress}%</span>
-        </div>
-      )}
-    </>
-  );
-}
-
-function renderAnalysisResult(event: AnalysisResultEvent) {
-  return (
-    <>
-      <div className="workflow-event-summary">{event.summary}</div>
-      {event.findings && event.findings.length > 0 && (
-        <div className="workflow-event-findings">
-          <div className="workflow-event-findings-label">发现:</div>
-          <ul>
-            {event.findings.map((finding, idx) => (
-              <li key={idx}>{finding}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {event.recommendations && event.recommendations.length > 0 && (
-        <div className="workflow-event-recommendations">
-          <div className="workflow-event-recommendations-label">建议:</div>
-          <ul>
-            {event.recommendations.map((rec, idx) => (
-              <li key={idx}>{rec}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </>
-  );
-}
-
-function renderInfoNeeded(event: InfoNeededEvent) {
-  return (
-    <>
-      <div className="workflow-event-question">{event.question}</div>
-      <div className="workflow-event-field">
-        <div className="workflow-event-field-label">字段:</div>
-        <div className="workflow-event-field-name">{event.fieldName}</div>
-      </div>
-      <div className="workflow-event-field">
-        <div className="workflow-event-field-label">类型:</div>
-        <div className="workflow-event-field-type">{event.fieldType}</div>
-      </div>
-      {event.options && event.options.length > 0 && (
-        <div className="workflow-event-options">
-          <div className="workflow-event-options-label">选项:</div>
-          <ul>
-            {event.options.map((option, idx) => (
-              <li key={idx}>{option}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </>
-  );
-}

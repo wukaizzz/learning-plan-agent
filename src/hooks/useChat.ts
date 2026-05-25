@@ -31,6 +31,7 @@ export function useChat() {
   }, [addMessage]);
 
   const addAssistantMessage = useCallback((content: string, toolCalls?: ToolCall[], extras?: Partial<Message>) => {
+    const bufferedWorkflowEvents = useChatStore.getState().currentWorkflowEvents;
     const message: Message = {
       id: `msg-${Date.now()}`,
       role: 'assistant',
@@ -38,7 +39,7 @@ export function useChat() {
       timestamp: Date.now(),
       tool_calls: toolCalls,
       ...extras,
-      workflow_events: [] // 🆕 初始化空事件数组
+      workflow_events: extras?.workflow_events ?? bufferedWorkflowEvents
     };
     addMessage(message);
 
@@ -53,13 +54,12 @@ export function useChat() {
     addWorkflowEvent(event);
 
     // 🆕 实时更新最后一条消息的事件
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage && lastMessage.role === 'assistant') {
-        updateMessageWorkflowEvents(lastMessage.id, [...(lastMessage.workflow_events || []), event]);
-      }
+    const store = useChatStore.getState();
+    const lastMessage = store.messages[store.messages.length - 1];
+    if (lastMessage && lastMessage.role === 'assistant') {
+      updateMessageWorkflowEvents(lastMessage.id, [...(lastMessage.workflow_events || []), event]);
     }
-  }, [addWorkflowEvent, messages, updateMessageWorkflowEvents]);
+  }, [addWorkflowEvent, updateMessageWorkflowEvents]);
 
   return {
     messages,

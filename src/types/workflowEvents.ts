@@ -61,6 +61,17 @@ export interface ProcessingEvent {
   progress?: number;
 }
 
+export interface IntentRoutedEvent {
+  type: 'intent_routed';
+  payload: {
+    intent: 'general_chat' | 'initial_planning' | 'tool_assisted_answer' | 'query_plan' | 'adjust_plan' | 'replan' | 'clarification' | 'unknown';
+    confidence: number;
+    source: 'llm' | 'rule_fallback';
+    certainty: 'high' | 'medium' | 'low';
+    message: string;
+  };
+}
+
 // 分析结果事件
 export interface AnalysisResultEvent {
   type: 'analysis_result';
@@ -76,6 +87,7 @@ export type WorkflowEvent =
   | ToolCallEvent
   | UIBlockUpdateEvent
   | ProcessingEvent
+  | IntentRoutedEvent
   | AnalysisResultEvent
   | ThinkingEvent
   | ThinkingEndEvent
