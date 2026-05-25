@@ -226,11 +226,19 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
   };
 
   const handleSendMessage = async (content: string) => {
-    const userMessage = addUserMessage(content);
-    const messagesForApi: Message[] = [
-      ...messages,
-      userMessage
-    ];
+    if (spaceId) {
+      const store = useChatStore.getState();
+      const currentSession = store.currentSessionId
+        ? store.sessions.find(session => session.id === store.currentSessionId)
+        : null;
+
+      if (!currentSession || currentSession.spaceId !== spaceId) {
+        store.switchToSpaceSession(spaceId);
+      }
+    }
+
+    addUserMessage(content);
+    const messagesForApi: Message[] = useChatStore.getState().messages;
     logger.info(
       { 
         messages: messagesForApi, 

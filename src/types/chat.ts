@@ -89,6 +89,7 @@ export interface ChatStore {
   updateSessionTitle: (sessionId: string, title: string) => void;
   getAllSessions: () => ChatSession[];
   getSessionsBySpace: (spaceId: string) => ChatSession[]; // 获取特定空间的会话
+  getGlobalSessions: () => ChatSession[]; // 获取不关联学习空间的通用会话
 
   // Space management
   setCurrentSpace: (spaceId: string | null) => void; // 切换当前空间

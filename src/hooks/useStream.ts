@@ -4,17 +4,35 @@ import { useAgent } from './useAgent';
 import { useChatStore } from '../store/chatStore';
 import { API_ENDPOINT } from '../utils/constants';
 import type { Message } from '../types/chat';
-import type { WorkflowStepEvent, InfoNeededEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, UIBlockUpdateEvent, ThinkingEvent, ThinkingEndEvent, IntentRoutedEvent } from '../types/workflowEvents';
+import type { WorkflowStepEvent, InfoNeededEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, UIBlockUpdateEvent, ThinkingEvent, ThinkingEndEvent, IntentRoutedEvent, WorkflowEvent } from '../types/workflowEvents';
+
+const createClientId = (prefix: string) => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
 
 export function useStream() {
   const { addAssistantMessage, setStreaming, 
-  updateToolCall, updateLastAssistantMessage, appendWorkflowEvent } = useChat();
+  updateToolCall, updateLastAssistantMessage } = useChat();
   const { getCurrentAgentConfig } = useAgent();
-  const { addUIBlock, clearUIBlocks, setWorkspaceState, addUIBlockToLastAssistantMessage, currentSpaceId } = useChatStore();
+  const {
+    addUIBlock,
+    clearUIBlocks,
+    setWorkspaceState,
+    addUIBlockToLastAssistantMessage,
+    currentSpaceId,
+    setCurrentWorkflowEvents,
+    addWorkflowEvent,
+    updateMessageWorkflowEvents
+  } = useChatStore();
   const currentMessageRef = useRef<string>('');
   const currentToolCallsRef = useRef<any[]>([]);
   const hasStartedStreaming = useRef<boolean>(false);
   const currentMessageIdRef = useRef<string | null>(null);
+  const activeRunIdRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const currentThinkingRef = useRef<string>('');
   const isThinkingActive = useRef<boolean>(false);
 
@@ -163,10 +181,30 @@ export function useStream() {
       return;
     }
 
-    const msg = addAssistantMessage(currentMessageRef.current, currentToolCallsRef.current);
+    const msg = addAssistantMessage(currentMessageRef.current, currentToolCallsRef.current, {
+      id: currentMessageIdRef.current || undefined
+    });
     currentMessageIdRef.current = msg.id;
     hasStartedStreaming.current = true;
   }, [addAssistantMessage]);
+
+  const appendCurrentWorkflowEvent = useCallback((event: WorkflowEvent) => {
+    if (event.runId && event.runId !== activeRunIdRef.current) {
+      return;
+    }
+
+    addWorkflowEvent({ ...event });
+
+    const messageId = currentMessageIdRef.current;
+    if (!messageId) {
+      return;
+    }
+
+    const store = useChatStore.getState();
+    const message = store.messages.find(item => item.id === messageId);
+    const nextEvents = [...(message?.workflow_events || []), { ...event }];
+    updateMessageWorkflowEvents(messageId, nextEvents);
+  }, [addWorkflowEvent, updateMessageWorkflowEvents]);
 
   // TODO 对话处理核心函数
   const streamResponse = useCallback(async (
@@ -178,11 +216,19 @@ export function useStream() {
       throw new Error('No agent configuration found');
     }
 
+    abortControllerRef.current?.abort();
+    const runId = createClientId('run');
+    const assistantMessageId = createClientId('msg');
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    activeRunIdRef.current = runId;
+    currentMessageIdRef.current = assistantMessageId;
     currentMessageRef.current = '';
     currentToolCallsRef.current = [];
     currentThinkingRef.current = '';
     isThinkingActive.current = false;
     hasStartedStreaming.current = false;
+    setCurrentWorkflowEvents([]);
     setStreaming(true);
     
     try {
@@ -195,10 +241,12 @@ export function useStream() {
         body: JSON.stringify({
           messages,
           agentConfig,
-          studySpaceId: currentSpaceId
-        })
+          studySpaceId: currentSpaceId,
+          runId,
+          messageId: assistantMessageId
+        }),
+        signal: abortController.signal
       });
-      console.log(JSON.stringify((messages)));
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -229,6 +277,10 @@ export function useStream() {
 
             try {
               const chunk = JSON.parse(data);
+              if (chunk.runId && chunk.runId !== activeRunIdRef.current) {
+                continue;
+              }
+
               switch (chunk.type) {
                 case 'content':
                   // Add content chunk
@@ -236,7 +288,9 @@ export function useStream() {
 
                   // Start streaming on first content chunk
                   if (!hasStartedStreaming.current) {
-                    const msg = addAssistantMessage(currentMessageRef.current, currentToolCallsRef.current);
+                    const msg = addAssistantMessage(currentMessageRef.current, currentToolCallsRef.current, {
+                      id: assistantMessageId
+                    });
                     currentMessageIdRef.current = msg.id; // 🆕 保存消息ID
                     hasStartedStreaming.current = true;
                   } else {
@@ -244,79 +298,82 @@ export function useStream() {
                     updateLastAssistantMessage(currentMessageRef.current);
                   }
 
-                  // 🆕 对于 content 类型也添加事件（如果需要）
-                  appendWorkflowEvent(chunk);
                   break;
 
                 case 'workflow_step':
                   // 处理工作流步骤事件
                   ensureAssistantMessage();
                   handleWorkflowStep(chunk);
-                  appendWorkflowEvent(chunk); // 🆕 添加事件
+                  appendCurrentWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'info_needed':
                   // 处理信息收集事件
                   ensureAssistantMessage();
                   handleInfoNeeded(chunk);
-                  appendWorkflowEvent(chunk); // 🆕 添加事件
+                  appendCurrentWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'tool_call':
                   // 处理工具调用事件
                   ensureAssistantMessage();
                   handleToolCall(chunk);
-                  appendWorkflowEvent(chunk); // 🆕 添加事件
+                  appendCurrentWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'processing':
                   // 处理处理进度事件
                   ensureAssistantMessage();
                   handleProcessing(chunk);
-                  appendWorkflowEvent(chunk); // 🆕 添加事件
+                  appendCurrentWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'intent_routed':
                   // 处理最终意图路由事件
+                  if (chunk.payload?.intent === 'general_chat') {
+                    handleIntentRouted(chunk);
+                    break;
+                  }
                   ensureAssistantMessage();
                   handleIntentRouted(chunk);
-                  appendWorkflowEvent(chunk);
+                  appendCurrentWorkflowEvent(chunk);
                   break;
 
                 case 'analysis_result':
                   // 处理分析结果事件
                   ensureAssistantMessage();
                   handleAnalysisResult(chunk);
-                  appendWorkflowEvent(chunk); // 🆕 添加事件
+                  appendCurrentWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'ui_block_update':
+                  ensureAssistantMessage();
                   handleUIBlockUpdate(chunk);
-                  appendWorkflowEvent(chunk);
+                  appendCurrentWorkflowEvent(chunk);
                   break;
 
                 case 'thinking':
                   ensureAssistantMessage();
                   handleThinking(chunk);
-                  appendWorkflowEvent(chunk);
+                  appendCurrentWorkflowEvent(chunk);
                   break;
 
                 case 'thinking_end':
                   ensureAssistantMessage();
                   handleThinkingEnd(chunk);
-                  appendWorkflowEvent(chunk);
+                  appendCurrentWorkflowEvent(chunk);
                   break;
 
                 case 'error':
                   console.error('Stream error:', chunk.error);
                   currentMessageRef.current += `\n\n[Error: ${chunk.error}]`;
                   if (!hasStartedStreaming.current) {
-                    addAssistantMessage(currentMessageRef.current);
+                    addAssistantMessage(currentMessageRef.current, undefined, { id: assistantMessageId });
                     hasStartedStreaming.current = true;
                   } else {
                     updateLastAssistantMessage(currentMessageRef.current);
                   }
-                  appendWorkflowEvent(chunk); // 🆕 添加事件
+                  appendCurrentWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
                 case 'done':
@@ -326,10 +383,10 @@ export function useStream() {
                   } else {
                     addAssistantMessage(
                       currentMessageRef.current,
-                      currentToolCallsRef.current.length > 0 ? currentToolCallsRef.current : undefined
+                      currentToolCallsRef.current.length > 0 ? currentToolCallsRef.current : undefined,
+                      { id: assistantMessageId }
                     );
                   }
-                  appendWorkflowEvent(chunk); // 🆕 添加事件
                   break;
               }
             } catch (e) {
@@ -339,13 +396,23 @@ export function useStream() {
         }
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
       console.error('Streaming failed:', error);
-      addAssistantMessage(`[Error: ${error instanceof Error ? error.message : 'Unknown error'}]`);
+      addAssistantMessage(`[Error: ${error instanceof Error ? error.message : 'Unknown error'}]`, undefined, {
+        id: assistantMessageId
+      });
     } finally {
-      setStreaming(false);
-      currentMessageIdRef.current = null; // 🆕 清空消息ID
+      if (activeRunIdRef.current === runId) {
+        setStreaming(false);
+        setCurrentWorkflowEvents([]);
+        currentMessageIdRef.current = null; // 🆕 清空消息ID
+        activeRunIdRef.current = null;
+        abortControllerRef.current = null;
+      }
     }
-  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, appendWorkflowEvent, currentSpaceId, ensureAssistantMessage, handleIntentRouted]); // 🆕 添加依赖
+  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, currentSpaceId, ensureAssistantMessage, handleIntentRouted, appendCurrentWorkflowEvent, setCurrentWorkflowEvents]); // 🆕 添加依赖
 
   const executeTool = useCallback(async (
     toolCallId: string,

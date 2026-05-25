@@ -12,16 +12,37 @@ const messageHasWorkflowProcess = (message: Message) =>
 
 const updateSessionMessage = (
   sessions: ChatSession[],
+  currentSessionId: string | null,
   messageId: string,
   updater: (message: Message) => void
 ) => {
-  sessions.forEach(session => {
-    const sessionMessage = session.messages.find(msg => msg.id === messageId);
-    if (sessionMessage) {
-      updater(sessionMessage);
-      session.updatedAt = Date.now();
-    }
-  });
+  const currentSession = currentSessionId
+    ? sessions.find(session => session.id === currentSessionId)
+    : null;
+  const sessionMessage = currentSession?.messages.find(msg => msg.id === messageId);
+
+  if (sessionMessage && currentSession) {
+    updater(sessionMessage);
+    currentSession.updatedAt = Date.now();
+  }
+};
+
+const createLegacySession = (
+  messages: Message[],
+  currentSpaceId: string | null,
+  currentSessionId?: string | null
+): ChatSession => {
+  const now = Date.now();
+  return {
+    id: currentSessionId || generateId(),
+    spaceId: currentSpaceId,
+    title: messages.find(message => message.role === 'user')?.content.slice(0, 30) || '历史对话',
+    messages,
+    createdAt: now,
+    updatedAt: now,
+    draftMessage: '',
+    scrollPosition: 0
+  };
 };
 
 export const useChatStore = create<ChatStore>()(
@@ -99,17 +120,20 @@ export const useChatStore = create<ChatStore>()(
           }
         });
 
-        // Update in sessions
-        state.sessions.forEach(session => {
-          session.messages.forEach(msg => {
-            if (msg.tool_calls) {
-              const toolCall = msg.tool_calls.find(tc => tc.id === toolCallId);
-              if (toolCall) {
-                Object.assign(toolCall, updates);
-              }
+        const session = state.currentSessionId
+          ? state.sessions.find(session => session.id === state.currentSessionId)
+          : null;
+        session?.messages.forEach(msg => {
+          if (msg.tool_calls) {
+            const toolCall = msg.tool_calls.find(tc => tc.id === toolCallId);
+            if (toolCall) {
+              Object.assign(toolCall, updates);
             }
-          });
+          }
         });
+        if (session) {
+          session.updatedAt = Date.now();
+        }
       }),
 
       updateMessage: (messageId: string, content: string) => set((state) => {
@@ -118,22 +142,21 @@ export const useChatStore = create<ChatStore>()(
           message.content = content;
         }
 
-        // Update in sessions
-        state.sessions.forEach(session => {
-          const message = session.messages.find(msg => msg.id === messageId);
-          if (message) {
-            message.content = content;
-          }
+        updateSessionMessage(state.sessions, state.currentSessionId, messageId, sessionMessage => {
+          sessionMessage.content = content;
         });
       }),
 
       deleteMessage: (messageId: string) => set((state) => {
         state.messages = state.messages.filter(msg => msg.id !== messageId);
 
-        // Delete from sessions
-        state.sessions.forEach(session => {
+        const session = state.currentSessionId
+          ? state.sessions.find(session => session.id === state.currentSessionId)
+          : null;
+        if (session) {
           session.messages = session.messages.filter(msg => msg.id !== messageId);
-        });
+          session.updatedAt = Date.now();
+        }
       }),
 
       addToolCall: (messageId: string, toolCall) => set((state) => {
@@ -145,15 +168,11 @@ export const useChatStore = create<ChatStore>()(
           message.tool_calls.push(toolCall);
         }
 
-        // Add to sessions
-        state.sessions.forEach(session => {
-          const message = session.messages.find(msg => msg.id === messageId);
-          if (message) {
-            if (!message.tool_calls) {
-              message.tool_calls = [];
-            }
-            message.tool_calls.push(toolCall);
+        updateSessionMessage(state.sessions, state.currentSessionId, messageId, sessionMessage => {
+          if (!sessionMessage.tool_calls) {
+            sessionMessage.tool_calls = [];
           }
+          sessionMessage.tool_calls.push(toolCall);
         });
       }),
 
@@ -170,6 +189,7 @@ export const useChatStore = create<ChatStore>()(
             const lastMessage = session.messages[session.messages.length - 1];
             if (lastMessage && lastMessage.role === 'assistant') {
               lastMessage.content = content;
+              session.updatedAt = Date.now();
             }
           }
         }
@@ -188,7 +208,7 @@ export const useChatStore = create<ChatStore>()(
           updater(message);
         }
 
-        updateSessionMessage(state.sessions, messageId, updater);
+        updateSessionMessage(state.sessions, state.currentSessionId, messageId, updater);
       }),
 
       addUIBlockToLastAssistantMessage: (block: UIBlock) => set((state) => {
@@ -205,7 +225,7 @@ export const useChatStore = create<ChatStore>()(
         };
 
         updater(lastMessage);
-        updateSessionMessage(state.sessions, lastMessage.id, updater);
+        updateSessionMessage(state.sessions, state.currentSessionId, lastMessage.id, updater);
       }),
 
       markLatestCollectionFormSubmitting: () => set((state) => {
@@ -215,7 +235,7 @@ export const useChatStore = create<ChatStore>()(
         }
 
         message.form_submission_state = 'submitting';
-        updateSessionMessage(state.sessions, message.id, sessionMessage => {
+        updateSessionMessage(state.sessions, state.currentSessionId, message.id, sessionMessage => {
           sessionMessage.form_submission_state = 'submitting';
         });
       }),
@@ -233,7 +253,7 @@ export const useChatStore = create<ChatStore>()(
         };
 
         updater(message);
-        updateSessionMessage(state.sessions, message.id, updater);
+        updateSessionMessage(state.sessions, state.currentSessionId, message.id, updater);
       }),
 
       resetLatestCollectionFormSubmissionState: () => set((state) => {
@@ -245,7 +265,7 @@ export const useChatStore = create<ChatStore>()(
         }
 
         message.form_submission_state = 'idle';
-        updateSessionMessage(state.sessions, message.id, sessionMessage => {
+        updateSessionMessage(state.sessions, state.currentSessionId, message.id, sessionMessage => {
           sessionMessage.form_submission_state = 'idle';
         });
       }),
@@ -263,7 +283,7 @@ export const useChatStore = create<ChatStore>()(
         };
 
         updater(message);
-        updateSessionMessage(state.sessions, message.id, updater);
+        updateSessionMessage(state.sessions, state.currentSessionId, message.id, updater);
       }),
 
       updateLatestWorkflowProcessStep: (stepId, status) => set((state) => {
@@ -279,15 +299,16 @@ export const useChatStore = create<ChatStore>()(
         };
 
         updater(message);
-        updateSessionMessage(state.sessions, message.id, updater);
+        updateSessionMessage(state.sessions, state.currentSessionId, message.id, updater);
       }),
 
       // Session management
       createNewSession: (title?: string, spaceId?: string | null) => {
         const sessionId = generateId();
+        const resolvedSpaceId = spaceId !== undefined ? spaceId : get().currentSpaceId;
         const newSession: ChatSession = {
           id: sessionId,
-          spaceId: spaceId || get().currentSpaceId, // 关联到当前空间或指定的空间
+          spaceId: resolvedSpaceId, // 关联到当前空间或指定的空间
           title: title || '新对话',
           messages: [],
           createdAt: Date.now(),
@@ -301,9 +322,7 @@ export const useChatStore = create<ChatStore>()(
           state.currentSessionId = sessionId;
           state.messages = [];
           // 更新当前空间ID
-          if (spaceId) {
-            state.currentSpaceId = spaceId;
-          }
+          state.currentSpaceId = resolvedSpaceId;
         });
 
         return sessionId;
@@ -329,8 +348,10 @@ export const useChatStore = create<ChatStore>()(
 
           // If deleting current session, switch to another or create new
           if (state.currentSessionId === sessionId) {
-            if (state.sessions.length > 0) {
-              const nextSession = state.sessions[0];
+            const nextSession = state.sessions
+              .filter(session => session.spaceId === state.currentSpaceId)
+              .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+            if (nextSession) {
               state.currentSessionId = nextSession.id;
               state.messages = nextSession.messages;
             } else {
@@ -356,6 +377,11 @@ export const useChatStore = create<ChatStore>()(
       getSessionsBySpace: (spaceId: string) => {
         const state = get();
         return state.sessions.filter(s => s.spaceId === spaceId);
+      },
+
+      getGlobalSessions: () => {
+        const state = get();
+        return state.sessions.filter(s => s.spaceId === null);
       },
 
       //  Draft management
@@ -389,6 +415,11 @@ export const useChatStore = create<ChatStore>()(
       setCurrentSpace: (spaceId: string | null) => {
         set((state) => {
           state.currentSpaceId = spaceId;
+          const latestSession = state.sessions
+            .filter(session => session.spaceId === spaceId)
+            .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+          state.currentSessionId = latestSession?.id ?? null;
+          state.messages = latestSession?.messages ?? [];
         });
       },
 
@@ -521,19 +552,67 @@ export const useChatStore = create<ChatStore>()(
           message.workflow_events = events;
         }
 
-        // Update in sessions
-        state.sessions.forEach(session => {
-          const message = session.messages.find(msg => msg.id === messageId);
-          if (message) {
-            message.workflow_events = events;
-          }
+        updateSessionMessage(state.sessions, state.currentSessionId, messageId, sessionMessage => {
+          sessionMessage.workflow_events = events;
         });
       })
     })),
     {
       name: 'chat-storage',
+      version: 2,
+      migrate: (persistedState: any) => {
+        if (!persistedState || typeof persistedState !== 'object') {
+          return persistedState;
+        }
+
+        const sessions = Array.isArray(persistedState.sessions)
+          ? persistedState.sessions
+          : [];
+        const legacyMessages = Array.isArray(persistedState.messages)
+          ? persistedState.messages
+          : [];
+
+        if (sessions.length === 0 && legacyMessages.length > 0) {
+          const legacySession = createLegacySession(
+            legacyMessages,
+            persistedState.currentSpaceId ?? null,
+            persistedState.currentSessionId
+          );
+          return {
+            ...persistedState,
+            sessions: [legacySession],
+            currentSessionId: legacySession.id,
+            messages: []
+          };
+        }
+
+        return {
+          ...persistedState,
+          messages: []
+        };
+      },
+      onRehydrateStorage: () => (state) => {
+        if (!state) {
+          return;
+        }
+
+        const currentSession = state.currentSessionId
+          ? state.sessions.find(session => session.id === state.currentSessionId)
+          : null;
+
+        if (currentSession) {
+          state.messages = currentSession.messages;
+          state.currentSpaceId = currentSession.spaceId;
+          return;
+        }
+
+        const latestSession = state.sessions
+          .filter(session => session.spaceId === state.currentSpaceId)
+          .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+        state.currentSessionId = latestSession?.id ?? null;
+        state.messages = latestSession?.messages ?? [];
+      },
       partialize: (state) => ({
-        messages: state.messages,
         currentAgentId: state.currentAgentId,
         currentSessionId: state.currentSessionId,
         currentSpaceId: state.currentSpaceId,

@@ -12,16 +12,16 @@ export const SessionList: React.FC = () => {
   const deleteSession = useChatStore(state => state.deleteSession);
   const createNewSession = useChatStore(state => state.createNewSession);
   const getSessionsBySpace = useChatStore(state => state.getSessionsBySpace);
+  const getGlobalSessions = useChatStore(state => state.getGlobalSessions);
 
   // 使用 useMemo 避免在 useEffect 中调用 setState
   const sessionList = React.useMemo(() => {
     if (currentSpaceId) {
       return getSessionsBySpace(currentSpaceId);
     } else {
-      // 如果没有关联空间，显示所有会话（向后兼容）
-      return sessions;
+      return getGlobalSessions();
     }
-  }, [sessions, currentSpaceId, getSessionsBySpace]);
+  }, [sessions, currentSpaceId, getSessionsBySpace, getGlobalSessions]);
 
   const handleCreateNew = () => {
     // 创建新会话时关联到当前空间

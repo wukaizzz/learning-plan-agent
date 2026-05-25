@@ -4,6 +4,7 @@ import { MessageItem } from './MessageItem';
 import { useChatStore } from '../../../store/chatStore';
 
 import './MessageList.css';
+import { logger } from '@/logger';
 
 interface MessageListProps {
   messages: Message[];
@@ -132,7 +133,13 @@ export const MessageList: React.FC<MessageListProps> = ({
       {messages.map((message) => {
         const isUser = message.role === 'user';
         const messageClassName = isUser ? 'message-wrapper-sticky' : 'message-wrapper';
-
+        logger.info(
+          { 
+            Component: "MessageList",
+            messagesList: messages
+          }, 
+          'MessageList detail'
+        );
         return (
           <div
             key={message.id}

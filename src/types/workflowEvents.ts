@@ -5,20 +5,27 @@
 
 import type { UIBlock } from './uiBlocks';
 
+export interface WorkflowEventMeta {
+  runId?: string;
+  messageId?: string;
+  stepId?: string;
+  timestamp?: number;
+}
+
 // 思考过程事件（R1 reasoning_content 或模拟思考）
-export interface ThinkingEvent {
+export interface ThinkingEvent extends WorkflowEventMeta {
   type: 'thinking';
   content: string;
 }
 
 // 思考结束事件
-export interface ThinkingEndEvent {
+export interface ThinkingEndEvent extends WorkflowEventMeta {
   type: 'thinking_end';
   duration: number;
 }
 
 // 工作流步骤事件
-export interface WorkflowStepEvent {
+export interface WorkflowStepEvent extends WorkflowEventMeta {
   type: 'workflow_step';
   step: 'collecting' | 'analyzing' | 'generating' | 'reviewing' | 'finalized' | 'paused';
   message?: string;
@@ -26,7 +33,7 @@ export interface WorkflowStepEvent {
 }
 
 // 信息收集事件
-export interface InfoNeededEvent {
+export interface InfoNeededEvent extends WorkflowEventMeta {
   type: 'info_needed';
   fieldName: string;
   question: string;
@@ -36,7 +43,7 @@ export interface InfoNeededEvent {
 }
 
 // 工具调用事件
-export interface ToolCallEvent {
+export interface ToolCallEvent extends WorkflowEventMeta {
   type: 'tool_call';
   toolName: string;
   parameters: Record<string, unknown>;
@@ -46,7 +53,7 @@ export interface ToolCallEvent {
 }
 
 // UI Block更新事件
-export interface UIBlockUpdateEvent {
+export interface UIBlockUpdateEvent extends WorkflowEventMeta {
   type: 'ui_block_update';
   action: 'add' | 'update' | 'remove';
   block?: UIBlock;
@@ -54,14 +61,14 @@ export interface UIBlockUpdateEvent {
 }
 
 // 处理进度事件
-export interface ProcessingEvent {
+export interface ProcessingEvent extends WorkflowEventMeta {
   type: 'processing';
   stage: string;
   details?: string;
   progress?: number;
 }
 
-export interface IntentRoutedEvent {
+export interface IntentRoutedEvent extends WorkflowEventMeta {
   type: 'intent_routed';
   payload: {
     intent: 'general_chat' | 'initial_planning' | 'tool_assisted_answer' | 'query_plan' | 'adjust_plan' | 'replan' | 'clarification' | 'unknown';
@@ -73,7 +80,7 @@ export interface IntentRoutedEvent {
 }
 
 // 分析结果事件
-export interface AnalysisResultEvent {
+export interface AnalysisResultEvent extends WorkflowEventMeta {
   type: 'analysis_result';
   summary: string;
   findings: string[];
@@ -91,9 +98,9 @@ export type WorkflowEvent =
   | AnalysisResultEvent
   | ThinkingEvent
   | ThinkingEndEvent
-  | { type: 'content'; content: string }
-  | { type: 'done' }
-  | { type: 'error'; error: string };
+  | ({ type: 'content'; content: string } & WorkflowEventMeta)
+  | ({ type: 'done' } & WorkflowEventMeta)
+  | ({ type: 'error'; error: string } & WorkflowEventMeta);
 
 // 后端SSE响应格式
 export interface SSEChunk {

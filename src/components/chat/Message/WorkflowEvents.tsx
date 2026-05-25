@@ -30,7 +30,6 @@ interface AgentProgressStep {
   id: string;
   title: string;
   detail?: string;
-  progress?: number;
   status: StepStatus;
   type: string;
   streamText?: string;
@@ -47,9 +46,10 @@ const WORKFLOW_STEP_LABELS: Record<string, string> = {
 };
 
 const PROCESSING_LABELS: Record<string, string> = {
-  intent_detection: '思考用户意图',
-  intent_classification: '形成路由决策',
-  rule_fallback: '使用规则兜底确认'
+  intent_detection: '分析请求',
+  public_process: '识别需求',
+  intent_classification: '确定处理方式',
+  rule_fallback: '确认处理意图'
 };
 
 const TOOL_LABELS: Record<string, string> = {
@@ -66,6 +66,7 @@ function getFieldLabel(event: InfoNeededEvent & { field?: string; fieldLabel?: s
     'goal.targetScore': '目标分数',
     targetScore: '目标分数',
     subjects: '考试科目',
+    intent: '处理意图',
     'availability.dailyHours': '每日学习时间',
     dailyHours: '每日学习时间'
   };
@@ -111,7 +112,6 @@ function createProcessSteps(events: WorkflowEvent[]): AgentProgressStep[] {
           type: 'processing',
           title: PROCESSING_LABELS[processing.stage] || '处理请求',
           detail: processing.details,
-          progress: processing.progress,
           status: 'running'
         });
         break;
@@ -142,7 +142,6 @@ function createProcessSteps(events: WorkflowEvent[]): AgentProgressStep[] {
           type: 'workflow_step',
           title: WORKFLOW_STEP_LABELS[workflowStep.step] || '推进学习计划流程',
           detail: workflowStep.message,
-          progress: workflowStep.progress,
           status: workflowStep.step === 'finalized' ? 'completed' : 'running'
         });
         break;
@@ -209,7 +208,7 @@ function createProcessSteps(events: WorkflowEvent[]): AgentProgressStep[] {
           upsertStep(steps, {
             id: activeStepId,
             type: 'thinking',
-            title: '思考处理方式',
+          title: '分析处理方式',
             status: 'running'
           });
         }
