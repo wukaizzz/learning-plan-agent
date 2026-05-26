@@ -3,6 +3,7 @@ import { useChat } from './useChat';
 import { useAgent } from './useAgent';
 import { useChatStore } from '../store/chatStore';
 import { API_ENDPOINT } from '../utils/constants';
+import { traceAgent } from '@/shared/debug/agentTrace';
 import type { Message, ToolCall, AgentExecutionState } from '../types/chat';
 import type { WorkflowStepEvent, InfoNeededEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, UIBlockUpdateEvent, ThinkingEvent, ThinkingEndEvent, IntentRoutedEvent, WorkflowEvent } from '../types/workflowEvents';
 
@@ -18,7 +19,8 @@ type SSEChunkHandler = (chunk: any) => void; // eslint-disable-line @typescript-
 async function consumeSSE(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   onChunk: SSEChunkHandler,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  traceContext?: { threadId?: string; messageId?: string; executionId?: string }
 ): Promise<void> {
   const decoder = new TextDecoder();
   let buffer = '';
@@ -35,11 +37,35 @@ async function consumeSSE(
     for (const line of lines) {
       if (line.startsWith('data: ')) {
         const data = line.slice(6);
-        if (data === '[DONE]') return;
+        if (data === '[DONE]') {
+          traceAgent({
+            layer: 'frontend:consumeSSE', label: 'stream ended [DONE]',
+            messageId: traceContext?.messageId,
+            threadId: traceContext?.threadId,
+            executionId: traceContext?.executionId
+          });
+          return;
+        }
         try {
           const chunk = JSON.parse(data);
+          traceAgent({
+            layer: 'frontend:consumeSSE',
+            label: 'chunk parsed',
+            eventType: chunk.type,
+            messageId: traceContext?.messageId || chunk.messageId,
+            threadId: traceContext?.threadId,
+            executionId: traceContext?.executionId,
+            data: { type: chunk.type }
+          });
           onChunk(chunk);
         } catch (e) {
+          traceAgent({
+            layer: 'frontend:consumeSSE',
+            label: 'chunk parse failed',
+            messageId: traceContext?.messageId,
+            threadId: traceContext?.threadId,
+            data: { raw: data.slice(0, 200) }
+          });
           console.error('Failed to parse chunk:', e);
         }
       }
@@ -73,6 +99,11 @@ export function useStream() {
   // 工作流事件处理函数
   const handleWorkflowStep = useCallback((event: WorkflowStepEvent) => {
     console.log('🔄 Workflow step:', event);
+    traceAgent({
+      layer: 'frontend:useStream', label: 'workflow_step',
+      eventType: 'workflow_step',
+      data: { step: event.step, progress: event.progress }
+    });
     // 只同步后端工作流阶段，不从 workflowManager 注入本地 mock blocks。
     setWorkspaceState(event.step);
 
@@ -185,6 +216,14 @@ export function useStream() {
   const handleUIBlockUpdate = useCallback((event: UIBlockUpdateEvent) => {
     console.log('🎨 UI Block update:', event);
 
+    if (event.action === 'add' && event.block?.type === 'collection-form') {
+      traceAgent({
+        layer: 'frontend:useStream', label: 'ui_block_update: collection-form',
+        eventType: 'ui_block_update',
+        data: { action: event.action, blockType: event.block.type, blockId: event.block.id }
+      });
+    }
+
     if (event.action === 'add' && event.block) {
       if (event.block.type === 'collection-form') {
         if (!hasStartedStreaming.current) {
@@ -218,6 +257,12 @@ export function useStream() {
 
   // Agent Execution handlers
   const handleAgentExecutionStart = useCallback((chunk: { executionId: string; messageId?: string; title: string; steps: Array<{ stepId: string; title: string }> }) => {
+    traceAgent({
+      layer: 'frontend:useStream', label: 'agent_execution_start',
+      executionId: chunk.executionId,
+      messageId: (chunk.messageId || currentMessageIdRef.current) ?? undefined,
+      data: { title: chunk.title, stepCount: chunk.steps.length }
+    });
     const messageId = chunk.messageId || currentMessageIdRef.current;
     if (!messageId) return;
     const execution: AgentExecutionState = {
@@ -230,7 +275,18 @@ export function useStream() {
   }, []);
 
   const handleAgentStepUpdate = useCallback((chunk: { executionId: string; messageId?: string; stepId: string; status: string; title?: string; summary?: string; description?: string; metadata?: Record<string, unknown> }) => {
-    const messageId = chunk.messageId || currentMessageIdRef.current;
+    const messageId = (chunk.messageId || currentMessageIdRef.current) ?? undefined;
+    const msgBefore = useChatStore.getState().messages.find(m => m.id === messageId);
+    traceAgent({
+      layer: 'frontend:useStream', label: 'agent_step_update',
+      executionId: chunk.executionId,
+      messageId,
+      eventType: 'agent_step_update',
+      data: {
+        stepId: chunk.stepId, status: chunk.status, summary: chunk.summary?.slice(0, 80),
+        prevSteps: msgBefore?.agent_execution?.steps.map(s => `${s.stepId}:${s.status}`)
+      }
+    });
     if (!messageId) return;
     const store = useChatStore.getState();
     const message = store.messages.find(m => m.id === messageId);
@@ -262,7 +318,18 @@ export function useStream() {
   }, []);
 
   const handleAgentExecutionFinish = useCallback((chunk: { executionId: string; messageId?: string; status: string; summary?: string }) => {
-    const messageId = chunk.messageId || currentMessageIdRef.current;
+    const messageId = (chunk.messageId || currentMessageIdRef.current) ?? undefined;
+    const msgBefore = useChatStore.getState().messages.find(m => m.id === messageId);
+    traceAgent({
+      layer: 'frontend:useStream', label: 'agent_execution_finish',
+      executionId: chunk.executionId,
+      messageId,
+      eventType: 'agent_execution_finish',
+      data: {
+        status: chunk.status, summary: chunk.summary,
+        prevStatus: msgBefore?.agent_execution?.status
+      }
+    });
     if (!messageId) return;
     const store = useChatStore.getState();
     const message = store.messages.find(m => m.id === messageId);
@@ -340,6 +407,13 @@ export function useStream() {
     isThinkingActive.current = false;
     hasStartedStreaming.current = false;
     setCurrentWorkflowEvents([]);
+    traceAgent({
+      layer: 'frontend:useStream',
+      label: 'streamResponse started',
+      messageId: assistantMessageId,
+      threadId: currentSpaceId ?? undefined,
+      data: { runId, apiProvider }
+    });
     setStreaming(true);
     
     try {
@@ -528,6 +602,11 @@ export function useStream() {
       });
     } finally {
       if (activeRunIdRef.current === runId) {
+        traceAgent({
+          layer: 'frontend:useStream',
+          label: 'streamResponse cleanup',
+          data: { runId }
+        });
         setStreaming(false);
         setCurrentWorkflowEvents([]);
         currentMessageIdRef.current = null; // 🆕 清空消息ID
@@ -546,6 +625,12 @@ export function useStream() {
     const { threadId, messageId, executionId, formData } = params;
 
     currentMessageIdRef.current = messageId;
+    traceAgent({
+      layer: 'frontend:useStream',
+      label: 'streamResume started',
+      messageId, executionId, threadId,
+      data: { formDataKeys: Object.keys(formData) }
+    });
     setStreaming(true);
 
     let finalized = false;
@@ -611,6 +696,12 @@ export function useStream() {
       console.error('Resume streaming failed:', error);
       throw error;
     } finally {
+      traceAgent({
+        layer: 'frontend:useStream',
+        label: 'streamResume completed',
+        executionId,
+        data: { finalized, interrupted }
+      });
       setStreaming(false);
     }
   }, [setStreaming, handleAgentStepUpdate, handleAgentExecutionFinish, handleWorkflowStep, handleInfoNeeded, handleUIBlockUpdate, handleThinking, handleThinkingEnd]);

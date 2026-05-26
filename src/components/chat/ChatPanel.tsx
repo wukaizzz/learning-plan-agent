@@ -7,6 +7,7 @@ import { PlanWorkspace } from './PlanWorkspace';
 import { WorkflowResumePrompt } from '@/components/workflow-resume/WorkflowResumePrompt';
 import { useChat, useStream, useAgent, useWorkflow } from '@/hooks';
 import { useChatStore, useSpaceStore } from '@/store';
+import { traceAgent } from '@/shared/debug/agentTrace';
 import type { Message } from '@/types';
 import { logger } from '@/logger';
 import './ChatPanel.css';
@@ -157,6 +158,11 @@ export const ChatPanel: React.FC = () => {
   }, [workspaceState, workflowInterrupted, activeFormStep]);
 
   const handleCollectionFormSubmit = async (formData: Record<string, unknown>) => {
+    traceAgent({
+      layer: 'frontend:ChatPanel', label: 'handleCollectionFormSubmit',
+      threadId: spaceId,
+      data: { activeFormStep, formDataKeys: Object.keys(formData) }
+    });
     submitFormStep(activeFormStep, formData);
 
     if (!spaceId) {
@@ -184,6 +190,12 @@ export const ChatPanel: React.FC = () => {
     const { executionId } = execMessage.agent_execution;
     const messageId = execMessage.id;
 
+    traceAgent({
+      layer: 'frontend:ChatPanel', label: 'active execution found',
+      messageId, executionId,
+      data: { stepStatuses: execMessage.agent_execution.steps.map(s => `${s.stepId}:${s.status}`) }
+    });
+
     // Reset steps 3-5 to pending, keep 1-2 completed
     const resetSteps = execMessage.agent_execution.steps.map((step, i) =>
       i >= 2
@@ -207,8 +219,18 @@ export const ChatPanel: React.FC = () => {
       });
 
       if (result.finalized) {
+        traceAgent({
+          layer: 'frontend:ChatPanel', label: 'streamResume result',
+          threadId: spaceId, messageId, executionId,
+          data: { finalized: true, interrupted: false, workspaceState: 'finalized' }
+        });
         setWorkspaceState('finalized');
       } else if (result.interrupted) {
+        traceAgent({
+          layer: 'frontend:ChatPanel', label: 'streamResume result',
+          threadId: spaceId, messageId, executionId,
+          data: { finalized: false, interrupted: true, workspaceState: 'paused' }
+        });
         setWorkspaceState('paused');
       }
     } catch (error) {
@@ -218,6 +240,11 @@ export const ChatPanel: React.FC = () => {
   };
 
   const handleSendMessage = async (content: string) => {
+    traceAgent({
+      layer: 'frontend:ChatPanel', label: 'handleSendMessage',
+      threadId: spaceId,
+      data: { contentLength: content.length }
+    });
     if (spaceId) {
       const store = useChatStore.getState();
       const currentSession = store.currentSessionId

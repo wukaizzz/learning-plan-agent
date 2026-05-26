@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { ChatStore, Message, ChatSession, WorkspaceState, UIBlock } from '@/types'
+import { traceAgent } from '@/shared/debug/agentTrace';
 const generateId = () => `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
 const messageHasCollectionForm = (message: Message) =>
@@ -63,6 +64,12 @@ export const useChatStore = create<ChatStore>()(
       currentWorkflowEvents: [], // 🆕 当前消息的工作流事件
 
       addMessage: (message: Message) => set((state) => {
+        traceAgent({
+          layer: 'frontend:messageStore', label: 'addMessage',
+          messageId: message.id,
+          eventType: 'addMessage',
+          data: { role: message.role, hasWorkflowEvents: !!message.workflow_events?.length }
+        });
         // 🆕 如果是 assistant 消息且有当前工作流事件，附加到消息
         if (message.role === 'assistant' && state.currentWorkflowEvents.length > 0 && !message.workflow_events) {
           message.workflow_events = [...state.currentWorkflowEvents];
@@ -137,6 +144,11 @@ export const useChatStore = create<ChatStore>()(
       }),
 
       updateMessage: (messageId: string, content: string) => set((state) => {
+        traceAgent({
+          layer: 'frontend:messageStore', label: 'updateMessage',
+          messageId, eventType: 'updateMessage',
+          data: { contentLength: content.length }
+        });
         const message = state.messages.find(msg => msg.id === messageId);
         if (message) {
           message.content = content;
@@ -177,6 +189,11 @@ export const useChatStore = create<ChatStore>()(
       }),
 
       updateLastAssistantMessage: (content: string) => set((state) => {
+        traceAgent({
+          layer: 'frontend:messageStore', label: 'updateLastAssistantMessage',
+          eventType: 'updateLastAssistantMessage',
+          data: { contentLength: content.length }
+        });
         const lastMessage = state.messages[state.messages.length - 1];
         if (lastMessage && lastMessage.role === 'assistant') {
           lastMessage.content = content;
@@ -212,6 +229,11 @@ export const useChatStore = create<ChatStore>()(
       }),
 
       addUIBlockToLastAssistantMessage: (block: UIBlock) => set((state) => {
+        traceAgent({
+          layer: 'frontend:messageStore', label: 'addUIBlockToLastAssistantMessage',
+          eventType: 'addUIBlockToLastAssistantMessage',
+          data: { blockType: block.type, blockId: block.id }
+        });
         const lastMessage = [...state.messages].reverse().find(msg => msg.role === 'assistant');
         if (!lastMessage) {
           return;
@@ -233,6 +255,11 @@ export const useChatStore = create<ChatStore>()(
         if (!message) {
           return;
         }
+        traceAgent({
+          layer: 'frontend:messageStore', label: 'markCollectionForm: submitting',
+          messageId: message.id, eventType: 'markLatestCollectionFormSubmitting',
+          data: { messageId: message.id }
+        });
 
         message.form_submission_state = 'submitting';
         updateSessionMessage(state.sessions, state.currentSessionId, message.id, sessionMessage => {
@@ -245,6 +272,11 @@ export const useChatStore = create<ChatStore>()(
         if (!message) {
           return;
         }
+        traceAgent({
+          layer: 'frontend:messageStore', label: 'markCollectionForm: submitted',
+          messageId: message.id, eventType: 'markLatestCollectionFormSubmitted',
+          data: { messageId: message.id }
+        });
 
         const updater = (targetMessage: Message) => {
           targetMessage.form_submission_state = 'submitted';
@@ -263,6 +295,11 @@ export const useChatStore = create<ChatStore>()(
         if (!message) {
           return;
         }
+        traceAgent({
+          layer: 'frontend:messageStore', label: 'markCollectionForm: reset',
+          messageId: message.id, eventType: 'resetLatestCollectionFormSubmissionState',
+          data: { messageId: message.id }
+        });
 
         message.form_submission_state = 'idle';
         updateSessionMessage(state.sessions, state.currentSessionId, message.id, sessionMessage => {
@@ -454,6 +491,11 @@ export const useChatStore = create<ChatStore>()(
       // 🆕 工作流和Block管理
       setWorkspaceState: (newState: WorkspaceState) => set((state) => {
         if (state.workspaceState !== newState) {
+          traceAgent({
+            layer: 'frontend:messageStore', label: 'setWorkspaceState',
+            eventType: 'setWorkspaceState',
+            data: { from: state.workspaceState, to: newState }
+          });
           state.workspaceState = newState;
         }
       }),
@@ -558,6 +600,20 @@ export const useChatStore = create<ChatStore>()(
       }),
 
       updateAgentExecution: (messageId, execution) => set((state) => {
+        const prev = state.messages.find(msg => msg.id === messageId)?.agent_execution;
+        traceAgent({
+          layer: 'frontend:messageStore', label: 'updateAgentExecution',
+          messageId,
+          executionId: execution.executionId,
+          eventType: 'updateAgentExecution',
+          data: {
+            prevStatus: prev?.status,
+            nextStatus: execution.status,
+            prevStepStatuses: prev?.steps.map(s => `${s.stepId}:${s.status}`),
+            nextStepStatuses: execution.steps.map(s => `${s.stepId}:${s.status}`)
+          }
+        });
+
         const message = state.messages.find(msg => msg.id === messageId);
         if (message) {
           message.agent_execution = execution;
