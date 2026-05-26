@@ -22,6 +22,7 @@ import './WorkflowEvents.css';
 interface WorkflowEventsProps {
   events: WorkflowEvent[];
   isStreaming?: boolean;
+  hasAgentExecution?: boolean;
 }
 
 type StepStatus = 'running' | 'completed' | 'pending' | 'failed';
@@ -272,12 +273,23 @@ function createProcessSteps(events: WorkflowEvent[]): AgentProgressStep[] {
   return steps;
 }
 
+const EVENTS_DUPLICATED_BY_AGENT_EXECUTION = new Set([
+  'workflow_step',
+  'ui_block_update',
+  'analysis_result'
+]);
+
 export const WorkflowEvents: React.FC<WorkflowEventsProps> = ({
   events,
-  isStreaming = false
+  isStreaming = false,
+  hasAgentExecution = false
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
-  const steps = useMemo(() => createProcessSteps(events), [events]);
+  const filteredEvents = useMemo(() => {
+    if (!hasAgentExecution) return events;
+    return events.filter(e => !EVENTS_DUPLICATED_BY_AGENT_EXECUTION.has(e.type));
+  }, [events, hasAgentExecution]);
+  const steps = useMemo(() => createProcessSteps(filteredEvents), [filteredEvents]);
 
   useEffect(() => {
     if (isStreaming && steps.length > 0) {

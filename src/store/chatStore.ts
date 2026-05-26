@@ -555,6 +555,17 @@ export const useChatStore = create<ChatStore>()(
         updateSessionMessage(state.sessions, state.currentSessionId, messageId, sessionMessage => {
           sessionMessage.workflow_events = events;
         });
+      }),
+
+      updateAgentExecution: (messageId, execution) => set((state) => {
+        const message = state.messages.find(msg => msg.id === messageId);
+        if (message) {
+          message.agent_execution = execution;
+        }
+
+        updateSessionMessage(state.sessions, state.currentSessionId, messageId, sessionMessage => {
+          sessionMessage.agent_execution = execution;
+        });
       })
     })),
     {

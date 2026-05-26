@@ -3,6 +3,7 @@ import type { Message } from '../../../types/chat';
 import { formatTimestamp } from '../../../utils/messageFormatter';
 import { renderBlocks } from '../../../core/schema/componentRegistry.tsx';
 import { WorkflowEvents } from './WorkflowEvents'; // 🆕 导入
+import { AgentExecutionCard } from './AgentExecutionCard';
 // markdown支持
 import ReactMarkdown from 'react-markdown';
 // 高亮支持
@@ -101,8 +102,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onCollectionF
         {!isUser && message.workflow_events && message.workflow_events.length > 0 && (
           <WorkflowEvents
             events={message.workflow_events}
-            isStreaming={false} // 已经流式传输完成
+            isStreaming={false}
+            hasAgentExecution={!!message.agent_execution}
           />
+        )}
+
+        {/* Agent Execution Card */}
+        {!isUser && message.agent_execution && (
+          <AgentExecutionCard execution={message.agent_execution} />
         )}
 
         <div className="message-content">

@@ -2,6 +2,23 @@
 import type { UIBlock } from './uiBlocks';
 import type { WorkspaceState } from './uiBlocks';
 import type { WorkflowEvent } from './workflowEvents';
+
+export interface AgentExecutionStep {
+  stepId: string;
+  title: string;
+  status: 'pending' | 'running' | 'completed' | 'waiting_input' | 'failed';
+  summary?: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgentExecutionState {
+  executionId: string;
+  title: string;
+  steps: AgentExecutionStep[];
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  summary?: string;
+}
 // Chat message types
 export interface Message {
   id: string;
@@ -16,6 +33,7 @@ export interface Message {
   workflow_events?: WorkflowEvent[];
   thinkingContent?: string;
   thinkingDuration?: number;
+  agent_execution?: AgentExecutionState;
 }
 
 export interface ToolCall {
@@ -122,4 +140,7 @@ export interface ChatStore {
   // 🆕 Scroll position management
   saveScrollPosition: (sessionId: string, position: number) => void;
   getScrollPosition: (sessionId: string) => number;
+
+  // Agent Execution
+  updateAgentExecution: (messageId: string, execution: AgentExecutionState) => void;
 }

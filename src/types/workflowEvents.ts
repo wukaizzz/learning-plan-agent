@@ -87,6 +87,33 @@ export interface AnalysisResultEvent extends WorkflowEventMeta {
   recommendations?: string[];
 }
 
+// Agent Execution 事件
+export interface AgentExecutionStartEvent extends WorkflowEventMeta {
+  type: 'agent_execution_start';
+  executionId: string;
+  title: string;
+  steps: Array<{ stepId: string; title: string }>;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgentStepUpdateEvent extends WorkflowEventMeta {
+  type: 'agent_step_update';
+  executionId: string;
+  stepId: string;
+  status: 'running' | 'completed' | 'waiting_input' | 'failed';
+  title?: string;
+  summary?: string;
+  description?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgentExecutionFinishEvent extends WorkflowEventMeta {
+  type: 'agent_execution_finish';
+  executionId: string;
+  status: 'completed' | 'failed' | 'cancelled';
+  summary?: string;
+}
+
 // 联合类型 - 所有SSE事件
 export type WorkflowEvent =
   | WorkflowStepEvent
@@ -98,6 +125,9 @@ export type WorkflowEvent =
   | AnalysisResultEvent
   | ThinkingEvent
   | ThinkingEndEvent
+  | AgentExecutionStartEvent
+  | AgentStepUpdateEvent
+  | AgentExecutionFinishEvent
   | ({ type: 'content'; content: string } & WorkflowEventMeta)
   | ({ type: 'done' } & WorkflowEventMeta)
   | ({ type: 'error'; error: string } & WorkflowEventMeta);

@@ -1,0 +1,144 @@
+.agent-execution-card {
+  margin: 8px 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.agent-execution-card.completed {
+  border-color: #10b981;
+}
+
+.agent-execution-card.failed {
+  border-color: #ef4444;
+}
+
+.agent-execution-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.agent-execution-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.agent-execution-icon.completed {
+  color: #10b981;
+}
+
+.agent-execution-icon.failed {
+  color: #ef4444;
+}
+
+.agent-execution-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #94a3b8;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: agent-spin 0.8s linear infinite;
+}
+
+@keyframes agent-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.agent-execution-checkmark {
+  font-weight: bold;
+}
+
+.agent-execution-title {
+  font-weight: 500;
+  color: #334155;
+}
+
+.agent-execution-count {
+  margin-left: auto;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.agent-execution-steps {
+  padding: 4px 0;
+}
+
+.agent-execution-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 12px;
+  min-height: 28px;
+}
+
+.agent-step-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.agent-step-running .agent-step-icon {
+  color: #3b82f6;
+}
+
+.agent-step-running .agent-step-icon .agent-step-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid #93c5fd;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: agent-spin 0.8s linear infinite;
+}
+
+.agent-step-completed .agent-step-icon {
+  color: #10b981;
+}
+
+.agent-step-failed .agent-step-icon {
+  color: #ef4444;
+}
+
+.agent-step-waiting_input .agent-step-icon {
+  color: #f59e0b;
+}
+
+.agent-step-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.agent-step-title {
+  color: #475569;
+  line-height: 1.4;
+}
+
+.agent-step-completed .agent-step-title {
+  color: #64748b;
+}
+
+.agent-step-summary {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 1px;
+}

@@ -3,7 +3,7 @@ import { useChat } from './useChat';
 import { useAgent } from './useAgent';
 import { useChatStore } from '../store/chatStore';
 import { API_ENDPOINT } from '../utils/constants';
-import type { Message, ToolCall } from '../types/chat';
+import type { Message, ToolCall, AgentExecutionState } from '../types/chat';
 import type { WorkflowStepEvent, InfoNeededEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, UIBlockUpdateEvent, ThinkingEvent, ThinkingEndEvent, IntentRoutedEvent, WorkflowEvent } from '../types/workflowEvents';
 
 const createClientId = (prefix: string) => {
@@ -181,6 +181,64 @@ export function useStream() {
       console.log('Remove block:', event.blockId);
     }
   }, [addAssistantMessage, addUIBlock, addUIBlockToLastAssistantMessage]);
+
+  // Agent Execution handlers
+  const handleAgentExecutionStart = useCallback((chunk: { executionId: string; messageId?: string; title: string; steps: Array<{ stepId: string; title: string }> }) => {
+    const messageId = chunk.messageId || currentMessageIdRef.current;
+    if (!messageId) return;
+    const execution: AgentExecutionState = {
+      executionId: chunk.executionId,
+      title: chunk.title,
+      steps: chunk.steps.map(s => ({ ...s, status: 'pending' as const })),
+      status: 'running'
+    };
+    useChatStore.getState().updateAgentExecution(messageId, execution);
+  }, []);
+
+  const handleAgentStepUpdate = useCallback((chunk: { executionId: string; messageId?: string; stepId: string; status: string; title?: string; summary?: string; description?: string; metadata?: Record<string, unknown> }) => {
+    const messageId = chunk.messageId || currentMessageIdRef.current;
+    if (!messageId) return;
+    const store = useChatStore.getState();
+    const message = store.messages.find(m => m.id === messageId);
+    if (!message?.agent_execution) {
+      // Dynamic append for unknown stepId
+      const execution: AgentExecutionState = {
+        executionId: chunk.executionId,
+        title: '执行中',
+        steps: [{ stepId: chunk.stepId, title: chunk.title || chunk.stepId, status: chunk.status as AgentExecutionState['steps'][number]['status'], summary: chunk.summary, description: chunk.description, metadata: chunk.metadata }],
+        status: 'running'
+      };
+      store.updateAgentExecution(messageId, execution);
+      return;
+    }
+    const prev = message.agent_execution;
+    const stepIndex = prev.steps.findIndex(s => s.stepId === chunk.stepId);
+    const updatedStep = {
+      stepId: chunk.stepId,
+      title: chunk.title || (stepIndex >= 0 ? prev.steps[stepIndex].title : chunk.stepId),
+      status: chunk.status as AgentExecutionState['steps'][number]['status'],
+      summary: chunk.summary ?? (stepIndex >= 0 ? prev.steps[stepIndex].summary : undefined),
+      description: chunk.description ?? (stepIndex >= 0 ? prev.steps[stepIndex].description : undefined),
+      metadata: chunk.metadata ?? (stepIndex >= 0 ? prev.steps[stepIndex].metadata : undefined)
+    };
+    const newSteps = stepIndex >= 0
+      ? prev.steps.map((s, i) => i === stepIndex ? updatedStep : s)
+      : [...prev.steps, updatedStep];
+    store.updateAgentExecution(messageId, { ...prev, steps: newSteps });
+  }, []);
+
+  const handleAgentExecutionFinish = useCallback((chunk: { executionId: string; messageId?: string; status: string; summary?: string }) => {
+    const messageId = chunk.messageId || currentMessageIdRef.current;
+    if (!messageId) return;
+    const store = useChatStore.getState();
+    const message = store.messages.find(m => m.id === messageId);
+    if (!message?.agent_execution) return;
+    store.updateAgentExecution(messageId, {
+      ...message.agent_execution,
+      status: chunk.status as AgentExecutionState['status'],
+      summary: chunk.summary
+    });
+  }, []);
 
   const ensureAssistantMessage = useCallback(() => {
     if (hasStartedStreaming.current) {
@@ -368,6 +426,18 @@ export function useStream() {
                   ensureAssistantMessage();
                   handleThinkingEnd(chunk);
                   appendCurrentWorkflowEvent(chunk);
+                  break;
+
+                case 'agent_execution_start':
+                  handleAgentExecutionStart(chunk);
+                  break;
+
+                case 'agent_step_update':
+                  handleAgentStepUpdate(chunk);
+                  break;
+
+                case 'agent_execution_finish':
+                  handleAgentExecutionFinish(chunk);
                   break;
 
                 case 'error':
