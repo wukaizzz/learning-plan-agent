@@ -276,7 +276,9 @@ function createProcessSteps(events: WorkflowEvent[]): AgentProgressStep[] {
 const EVENTS_DUPLICATED_BY_AGENT_EXECUTION = new Set([
   'workflow_step',
   'ui_block_update',
-  'analysis_result'
+  'analysis_result',
+  'thinking',
+  'thinking_end'
 ]);
 
 export const WorkflowEvents: React.FC<WorkflowEventsProps> = ({

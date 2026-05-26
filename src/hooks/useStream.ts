@@ -13,6 +13,40 @@ const createClientId = (prefix: string) => {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
+type SSEChunkHandler = (chunk: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+async function consumeSSE(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  onChunk: SSEChunkHandler,
+  signal?: AbortSignal
+): Promise<void> {
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    if (signal?.aborted) break;
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6);
+        if (data === '[DONE]') return;
+        try {
+          const chunk = JSON.parse(data);
+          onChunk(chunk);
+        } catch (e) {
+          console.error('Failed to parse chunk:', e);
+        }
+      }
+    }
+  }
+}
+
 export function useStream() {
   const { addAssistantMessage, setStreaming, 
   updateToolCall, updateLastAssistantMessage } = useChat();
@@ -233,8 +267,21 @@ export function useStream() {
     const store = useChatStore.getState();
     const message = store.messages.find(m => m.id === messageId);
     if (!message?.agent_execution) return;
+    const prev = message.agent_execution;
+
+    const convergedSteps = prev.steps.map(step => {
+      if (chunk.status === 'completed') {
+        if (step.status === 'running') return { ...step, status: 'completed' as const };
+        if (step.status === 'pending') return { ...step, status: 'completed' as const };
+      } else if (chunk.status === 'failed') {
+        if (step.status === 'running') return { ...step, status: 'failed' as const };
+      }
+      return step;
+    });
+
     store.updateAgentExecution(messageId, {
-      ...message.agent_execution,
+      ...prev,
+      steps: convergedSteps,
       status: chunk.status as AgentExecutionState['status'],
       summary: chunk.summary
     });
@@ -490,6 +537,84 @@ export function useStream() {
     }
   }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, currentSpaceId, ensureAssistantMessage, handleIntentRouted, appendCurrentWorkflowEvent, setCurrentWorkflowEvents, handleWorkflowStep, handleInfoNeeded, handleToolCall, handleProcessing, handleAnalysisResult, handleUIBlockUpdate, handleThinking, handleThinkingEnd]);
 
+  const streamResume = useCallback(async (params: {
+    threadId: string;
+    messageId: string;
+    executionId: string;
+    formData: Record<string, unknown>;
+  }): Promise<{ finalized: boolean; interrupted: boolean }> => {
+    const { threadId, messageId, executionId, formData } = params;
+
+    currentMessageIdRef.current = messageId;
+    setStreaming(true);
+
+    let finalized = false;
+    let interrupted = false;
+
+    try {
+      const response = await fetch(`${API_ENDPOINT}/workflows/${threadId}/resume-stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ executionId, messageId, ...formData }),
+      });
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+
+      await consumeSSE(reader, (chunk) => {
+        switch (chunk.type) {
+          case 'agent_step_update':
+            handleAgentStepUpdate(chunk);
+            if (chunk.status === 'waiting_input') interrupted = true;
+            break;
+          case 'agent_execution_finish':
+            handleAgentExecutionFinish(chunk);
+            if (chunk.status === 'completed') finalized = true;
+            break;
+          case 'workflow_step':
+            handleWorkflowStep(chunk);
+            if (chunk.step === 'paused') interrupted = true;
+            break;
+          case 'info_needed':
+            handleInfoNeeded(chunk);
+            interrupted = true;
+            break;
+          case 'ui_block_update':
+            handleUIBlockUpdate(chunk);
+            break;
+          case 'content': {
+            const store = useChatStore.getState();
+            const msg = store.messages.find(m => m.id === messageId);
+            const nextContent = (msg?.content || '') + chunk.content;
+            useChatStore.getState().updateMessage(messageId, nextContent);
+            break;
+          }
+          case 'thinking':
+            handleThinking(chunk);
+            break;
+          case 'thinking_end':
+            handleThinkingEnd(chunk);
+            break;
+          case 'error':
+            console.error('Resume stream error:', chunk.error);
+            break;
+        }
+      });
+
+      return { finalized, interrupted };
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return { finalized: false, interrupted: false };
+      }
+      console.error('Resume streaming failed:', error);
+      throw error;
+    } finally {
+      setStreaming(false);
+    }
+  }, [setStreaming, handleAgentStepUpdate, handleAgentExecutionFinish, handleWorkflowStep, handleInfoNeeded, handleUIBlockUpdate, handleThinking, handleThinkingEnd]);
+
   const executeTool = useCallback(async (
     toolCallId: string,
     toolName: string,
@@ -528,6 +653,7 @@ export function useStream() {
 
   return {
     streamResponse,
+    streamResume,
     executeTool,
     isStreaming: useChat().isStreaming
   };

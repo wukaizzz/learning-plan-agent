@@ -112,15 +112,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onCollectionF
           <AgentExecutionCard execution={message.agent_execution} />
         )}
 
-        <div className="message-content">
-          <ReactMarkdown
-            components={{
-              code: CodeBlock,
-            }}
-          >
-            {message.content}
-          </ReactMarkdown>
-        </div>
         {!isUser && hasSubmittedSummary && (
           <div className="message-submitted-form-summary">
             <div className="message-submitted-form-title">已提交信息</div>
@@ -135,7 +126,17 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onCollectionF
           </div>
         )}
 
-        {!isUser && processSteps.length > 0 && (
+        <div className="message-content">
+          <ReactMarkdown
+            components={{
+              code: CodeBlock,
+            }}
+          >
+            {message.content}
+          </ReactMarkdown>
+        </div>
+
+        {!isUser && processSteps.length > 0 && !message.agent_execution && (
           <div className="message-workflow-process">
             {processSteps.map(step => (
               <div className={`message-workflow-process-step ${step.status}`} key={step.id}>

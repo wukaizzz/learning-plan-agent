@@ -6,22 +6,10 @@ import { WorkflowSection } from './WorkflowSection';
 import { PlanWorkspace } from './PlanWorkspace';
 import { WorkflowResumePrompt } from '@/components/workflow-resume/WorkflowResumePrompt';
 import { useChat, useStream, useAgent, useWorkflow } from '@/hooks';
-import { useLangGraphWorkflow } from '@/hooks/useLangGraphWorkflow';
 import { useChatStore, useSpaceStore } from '@/store';
-import type { Message, WorkflowProcessStep } from '@/types';
+import type { Message } from '@/types';
 import { logger } from '@/logger';
 import './ChatPanel.css';
-
-const PROCESS_STEP_DELAY_MS = 650;
-const INITIAL_PROCESS_STEPS: WorkflowProcessStep[] = [
-  { id: 'initializing', label: '初次学习计划创建中', status: 'completed' },
-  { id: 'waiting_for_info', label: '缺失数据，等待用户填写', status: 'completed' },
-  { id: 'info_submitted', label: '填写完成，开始分析', status: 'completed' },
-  { id: 'analyzing', label: '分析考试时间和目标分数', status: 'running' },
-  { id: 'creating_tasks', label: '创建任务列表中', status: 'pending' },
-  { id: 'building_ui', label: '构建计划展示中', status: 'pending' },
-  { id: 'finalized', label: '学习计划已生成', status: 'pending' }
-];
 
 type CollectionFormField = {
   name: string;
@@ -66,13 +54,9 @@ function createSubmittedFormSummary(
   }));
 }
 
-function delay(ms: number) {
-  return new Promise(resolve => window.setTimeout(resolve, ms));
-}
-
 export const ChatPanel: React.FC = () => {
   const { messages, isStreaming, addUserMessage } = useChat();
-  const { streamResponse } = useStream();
+  const { streamResponse, streamResume } = useStream();
   const { getCurrentAgentConfig } = useAgent();
   const {
     switchToSpaceSession,
@@ -84,9 +68,7 @@ export const ChatPanel: React.FC = () => {
     setWorkspaceState,
     markLatestCollectionFormSubmitting,
     markLatestCollectionFormSubmitted,
-    resetLatestCollectionFormSubmissionState,
-    initializeLatestWorkflowProcessSteps,
-    updateLatestWorkflowProcessStep
+    resetLatestCollectionFormSubmissionState
   } = useChatStore();
 
   const workspaceState = useChatStore(state => state.workspaceState);
@@ -97,7 +79,6 @@ export const ChatPanel: React.FC = () => {
   const setActiveFormStep = useChatStore(state => state.setActiveFormStep);
   const currentSessionId = useChatStore(state => state.currentSessionId);
   const { transitionToState, isWorkflowActive } = useWorkflow();
-  const { resumeWithoutApplying, applyWorkflowResponse } = useLangGraphWorkflow();
   const navigate = useNavigate();
   const { spaceId } = useParams();
   const { getCurrentSpace } = useSpaceStore();
@@ -175,23 +156,6 @@ export const ChatPanel: React.FC = () => {
     };
   }, [workspaceState, workflowInterrupted, activeFormStep]);
 
-  const playCompletedResumeProcess = async () => {
-    await delay(PROCESS_STEP_DELAY_MS);
-    updateLatestWorkflowProcessStep('analyzing', 'completed');
-    updateLatestWorkflowProcessStep('creating_tasks', 'running');
-
-    await delay(PROCESS_STEP_DELAY_MS);
-    updateLatestWorkflowProcessStep('creating_tasks', 'completed');
-    updateLatestWorkflowProcessStep('building_ui', 'running');
-
-    await delay(PROCESS_STEP_DELAY_MS);
-    updateLatestWorkflowProcessStep('building_ui', 'completed');
-    updateLatestWorkflowProcessStep('finalized', 'running');
-
-    await delay(PROCESS_STEP_DELAY_MS);
-    updateLatestWorkflowProcessStep('finalized', 'completed');
-  };
-
   const handleCollectionFormSubmit = async (formData: Record<string, unknown>) => {
     submitFormStep(activeFormStep, formData);
 
@@ -208,19 +172,49 @@ export const ChatPanel: React.FC = () => {
 
     markLatestCollectionFormSubmitting();
     markLatestCollectionFormSubmitted(summary);
-    initializeLatestWorkflowProcessSteps(INITIAL_PROCESS_STEPS);
-    setWorkspaceState('analyzing');
 
-    const response = await resumeWithoutApplying(spaceId, allFormData as Record<string, string | number>);
+    const store = useChatStore.getState();
+    const execMessage = [...store.messages].reverse()
+      .find(m => m.role === 'assistant' && m.agent_execution && m.agent_execution.status !== 'completed');
 
-    if (!response.success) {
-      updateLatestWorkflowProcessStep('analyzing', 'failed');
-      resetLatestCollectionFormSubmissionState();
-      throw new Error(response.error || '工作流恢复失败');
+    if (!execMessage?.agent_execution) {
+      throw new Error('No active agent execution found');
     }
 
-    await playCompletedResumeProcess();
-    applyWorkflowResponse(response);
+    const { executionId } = execMessage.agent_execution;
+    const messageId = execMessage.id;
+
+    // Reset steps 3-5 to pending, keep 1-2 completed
+    const resetSteps = execMessage.agent_execution.steps.map((step, i) =>
+      i >= 2
+        ? { ...step, status: 'pending' as const, summary: undefined }
+        : { ...step, status: 'completed' as const, summary: step.summary || '信息已补充' }
+    );
+    store.updateAgentExecution(messageId, {
+      ...execMessage.agent_execution,
+      steps: resetSteps,
+      status: 'running'
+    });
+
+    setWorkspaceState('analyzing');
+
+    try {
+      const result = await streamResume({
+        threadId: spaceId,
+        messageId,
+        executionId,
+        formData: allFormData
+      });
+
+      if (result.finalized) {
+        setWorkspaceState('finalized');
+      } else if (result.interrupted) {
+        setWorkspaceState('paused');
+      }
+    } catch (error) {
+      resetLatestCollectionFormSubmissionState();
+      throw error;
+    }
   };
 
   const handleSendMessage = async (content: string) => {
