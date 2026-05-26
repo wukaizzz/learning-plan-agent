@@ -726,7 +726,7 @@ const ScheduleStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
 };
 
 // ============= 步骤5：确认创建 =============
-const ReviewStep: React.FC<{ data: any }> = ({ data }) => {
+const ReviewStep: React.FC<{ data: SpaceFormData }> = ({ data }) => {
   return (
     <div className="wizard-step-content">
       <h3>确认创建</h3>

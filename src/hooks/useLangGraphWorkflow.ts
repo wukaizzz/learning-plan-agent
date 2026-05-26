@@ -42,12 +42,12 @@ export interface UseLangGraphWorkflowReturn {
 
   resume: (
     threadId: string,
-    userInput: Record<string, any>
+    userInput: Record<string, unknown>
   ) => Promise<WorkflowResponse>;
 
   resumeWithoutApplying: (
     threadId: string,
-    userInput: Record<string, any>
+    userInput: Record<string, unknown>
   ) => Promise<WorkflowResponse>;
 
   replan: (
@@ -104,7 +104,7 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
         .filter(block => block.type !== 'collection-form');
 
       // Sort by block order.
-      transformedBlocks.sort((a, b) => (a.props.order || 0) - (b.props.order || 0));
+      transformedBlocks.sort((a, b) => ((a.props.order as number) || 0) - ((b.props.order as number) || 0));
 
       transformedBlocks.forEach(block => {
         addUIBlock(block);
@@ -168,7 +168,7 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
    */
   const resume = useCallback(async (
     threadId: string,
-    userInput: Record<string, any>
+    userInput: Record<string, unknown>
   ): Promise<WorkflowResponse> => {
     setIsLoading(true);
     setError(null);
@@ -200,7 +200,7 @@ export const useLangGraphWorkflow = (): UseLangGraphWorkflowReturn => {
    */
   const resumeWithoutApplying = useCallback(async (
     threadId: string,
-    userInput: Record<string, any>
+    userInput: Record<string, unknown>
   ): Promise<WorkflowResponse> => {
     setIsLoading(true);
     setError(null);

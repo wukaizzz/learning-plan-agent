@@ -500,7 +500,7 @@ export const useChatStore = create<ChatStore>()(
         }
       }),
  
-      submitFormStep: (stepIndex: number, data: Record<string, any>) => set((state) => {
+      submitFormStep: (stepIndex: number, data: Record<string, unknown>) => set((state) => {
         const existingData = state.formStepsData[stepIndex];
         if (!existingData || JSON.stringify(existingData) !== JSON.stringify(data)) {
           state.formStepsData[stepIndex] = data;
@@ -560,26 +560,27 @@ export const useChatStore = create<ChatStore>()(
     {
       name: 'chat-storage',
       version: 2,
-      migrate: (persistedState: any) => {
+      migrate: (persistedState: unknown) => {
         if (!persistedState || typeof persistedState !== 'object') {
-          return persistedState;
+          return persistedState as Record<string, unknown>;
         }
 
-        const sessions = Array.isArray(persistedState.sessions)
-          ? persistedState.sessions
+        const state = persistedState as Record<string, unknown>;
+        const sessions = Array.isArray(state.sessions)
+          ? state.sessions
           : [];
-        const legacyMessages = Array.isArray(persistedState.messages)
-          ? persistedState.messages
+        const legacyMessages = Array.isArray(state.messages)
+          ? state.messages
           : [];
 
         if (sessions.length === 0 && legacyMessages.length > 0) {
           const legacySession = createLegacySession(
             legacyMessages,
-            persistedState.currentSpaceId ?? null,
-            persistedState.currentSessionId
+            (state.currentSpaceId as string | null) ?? null,
+            state.currentSessionId as string | null
           );
           return {
-            ...persistedState,
+            ...state,
             sessions: [legacySession],
             currentSessionId: legacySession.id,
             messages: []
@@ -587,7 +588,7 @@ export const useChatStore = create<ChatStore>()(
         }
 
         return {
-          ...persistedState,
+          ...state,
           messages: []
         };
       },

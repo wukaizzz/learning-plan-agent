@@ -10,18 +10,18 @@ export interface FormField {
   originalPath?: string;
   label: string;
   type: 'text' | 'number' | 'date' | 'select' | 'textarea';
-  value?: any;
+  value?: string | number;
   placeholder?: string;
   required?: boolean;
   options?: string[];
-  validation?: (value: any) => boolean | string;
+  validation?: (value: unknown) => boolean | string;
 }
 
 // CollectionForm组件属性
 interface CollectionFormProps {
   stage?: 'initial' | 'details' | 'confirmation';
   fields: FormField[];
-  onSubmit: (data: Record<string, any>) => void | Promise<void>;
+  onSubmit: (data: Record<string, unknown>) => void | Promise<void>;
   onCancel?: () => void;
   title?: string;
   description?: string;
@@ -45,7 +45,7 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
   totalSteps = 1,
   showProgress = false
 }) => {
-  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [formData, setFormData] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false); // 🆕 提交状态
@@ -55,25 +55,25 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
 
   // 初始化表单数据
   useEffect(() => {
-    const initialData: Record<string, any> = {};
-    
+    const initialData: Record<string, string> = {};
+
     // ✅ 先检查是否需要初始化（避免无限循环）
     let needsInit = false;
     fields.forEach(field => {
       // 只在字段不存在时才初始化
       if (field.value !== undefined && formData[field.name] === undefined) {
-        initialData[field.name] = field.value;
+        initialData[field.name] = String(field.value);
         needsInit = true;
       }
     });
-    
+
     // ✅ 只有在真正需要初始化时才更新状态
     if (needsInit) {
-      setFormData(initialData);
+      setFormData(initialData); // eslint-disable-line react-hooks/set-state-in-effect
     }
-  }, [fields]); // ✅ fields 变化时重新计算
+  }, [fields, formData]);
 
-  const handleFieldChange = (name: string, value: any) => {
+  const handleFieldChange = (name: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -89,7 +89,7 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
     }
   };
 
-  const validateField = (field: FormField, value: any): string | null => {
+  const validateField = (field: FormField, value: string | undefined): string | null => {
     // 必填验证
     if (field.required && (!value || value === '')) {
       return `${field.label}是必填项`;
@@ -129,7 +129,7 @@ export const CollectionForm: React.FC<CollectionFormProps> = ({
 
     setIsSubmitting(true);
     try {
-      const submitData = fields.reduce<Record<string, any>>((acc, field) => {
+      const submitData = fields.reduce<Record<string, unknown>>((acc, field) => {
         acc[field.originalPath || field.name] = formData[field.name];
         return acc;
       }, {});

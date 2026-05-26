@@ -171,7 +171,7 @@ export const useSpaceStore = create<SpaceStore>()(
       },
 
       // 🆕 更新空间的特定字段（支持嵌套路径，如 "goal.examDate"）
-      updateSpaceFields: (spaceId: string, fieldsData: Record<string, any>) => {
+      updateSpaceFields: (spaceId: string, fieldsData: Record<string, unknown>) => {
         set((state) => {
           const space = state.spaces.find(s => s.id === spaceId);
           if (!space) return;
@@ -179,6 +179,7 @@ export const useSpaceStore = create<SpaceStore>()(
           // 遍历所有字段数据
           Object.entries(fieldsData).forEach(([fieldPath, value]) => {
             const parts = fieldPath.split('.');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic nested path traversal
             let current = space as any;
 
             // 遍历路径，找到要更新的对象

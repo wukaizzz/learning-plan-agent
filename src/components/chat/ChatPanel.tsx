@@ -51,7 +51,7 @@ function createSubmittedFormSummary(
   );
   const fields: CollectionFormField[] = formMessage?.ui_blocks
     ?.filter(block => block.type === 'collection-form')
-    .flatMap(block => block.props?.fields || []) || [];
+    .flatMap(block => (block.props?.fields as CollectionFormField[] | undefined) || []) || [];
 
   if (fields.length === 0) {
     return Object.entries(formData).map(([key, value]) => ({
@@ -70,9 +70,7 @@ function delay(ms: number) {
   return new Promise(resolve => window.setTimeout(resolve, ms));
 }
 
-interface ChatPanelProps {}
-
-export const ChatPanel: React.FC<ChatPanelProps> = () => {
+export const ChatPanel: React.FC = () => {
   const { messages, isStreaming, addUserMessage } = useChat();
   const { streamResponse } = useStream();
   const { getCurrentAgentConfig } = useAgent();
@@ -152,7 +150,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = () => {
     } else if (!currentSessionId) {
       createNewSession();
     }
-  }, [spaceId, currentSessionId, switchToSpaceSession]);
+  }, [spaceId, currentSessionId, switchToSpaceSession, createNewSession]);
 
   useEffect(() => {
     const { workspaceState, workflowInterrupted, lastFormStep } = latestStateRef.current;

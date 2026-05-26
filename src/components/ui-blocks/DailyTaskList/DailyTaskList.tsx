@@ -65,7 +65,7 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
       };
       return {
         ...prev,
-        [taskId]: (statusFlow[currentStatus] || 'pending') as any
+        [taskId]: (statusFlow[currentStatus] || 'pending') as 'pending' | 'in_progress' | 'completed' | 'skipped'
       };
     });
   };

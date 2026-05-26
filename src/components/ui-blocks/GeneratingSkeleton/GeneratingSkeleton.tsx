@@ -41,7 +41,7 @@ export const GeneratingSkeleton: React.FC<GeneratingSkeletonComponentProps> = ({
 
       return () => clearInterval(timer);
     }
-  }, [progress]);
+  }, [progress, animatedProgress]);
 
   // 获取步骤状态样式
   const getStepStatusClass = (status: string): string => {

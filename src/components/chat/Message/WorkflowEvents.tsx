@@ -257,7 +257,7 @@ function createProcessSteps(events: WorkflowEvent[]): AgentProgressStep[] {
           id,
           type: 'error',
           title: '处理遇到问题',
-          detail: (event as any).error,
+          detail: (event as { error?: string }).error,
           status: 'failed'
         });
         break;
@@ -281,7 +281,7 @@ export const WorkflowEvents: React.FC<WorkflowEventsProps> = ({
 
   useEffect(() => {
     if (isStreaming && steps.length > 0) {
-      setIsExpanded(true);
+      setIsExpanded(true); // eslint-disable-line react-hooks/set-state-in-effect
     }
   }, [isStreaming, steps.length]);
 

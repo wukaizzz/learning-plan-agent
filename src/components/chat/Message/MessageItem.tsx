@@ -9,6 +9,71 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
+// Extracted code block component to satisfy rules-of-hooks
+const CodeBlock: React.FC<{ className?: string; children?: React.ReactNode }> = ({ className, children }) => {
+  const [expanded, setExpanded] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const match = /language-(\w+)/.exec(className || '');
+  const language = match?.[1] || 'code';
+  const codeContent = String(children).replace(/\n$/, '');
+
+  if (!match) {
+    return <code style={{ background: '#eee', padding: '2px 4px', borderRadius: 4 }}>{children}</code>;
+  }
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(codeContent);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div style={{ margin: '16px 0', padding: '', borderRadius: 8, overflow: 'hidden', backgroundColor: '#1e1e1e' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', backgroundColor: '#2d2d2d', color: '#d1d5db', fontSize: 12 }}>
+        <div
+          onClick={() => setExpanded(!expanded)}
+          style={{ fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+        >
+          {language}
+          <div
+            style={{
+              width: 0,
+              height: 0,
+              borderLeft: '4px solid transparent',
+              borderRight: '4px solid transparent',
+              borderBottom: '4px solid #d1d5db',
+              transform: expanded ? 'rotate(180deg)' : 'rotate(0)',
+              transition: 'transform 0.2s ease',
+            }}
+          />
+        </div>
+        <button
+          onClick={handleCopy}
+          style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer' }}
+        >
+          {copied ? 'copied' : 'copy'}
+        </button>
+      </div>
+      <div
+        style={{
+          height: expanded ? 'auto' : 0,
+          overflow: 'hidden',
+          transition: 'height 0.3s ease',
+        }}
+      >
+        <SyntaxHighlighter
+          language={language}
+          style={vscDarkPlus as unknown as React.ComponentProps<typeof SyntaxHighlighter>['style']}
+          PreTag="div"
+        >
+          {codeContent}
+        </SyntaxHighlighter>
+      </div>
+    </div>
+  );
+};
+
 interface MessageItemProps {
   message: Message;
   onCollectionFormSubmit?: (data: Record<string, unknown>) => Promise<void>;
@@ -43,73 +108,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onCollectionF
         <div className="message-content">
           <ReactMarkdown
             components={{
-              code({ className, children }) {
-                const [expanded, setExpanded] = useState(true);
-                const [copied, setCopied] = useState(false);
-                const match = /language-(\w+)/.exec(className || '');
-                const language = match?.[1] || 'code';
-                const codeContent = String(children).replace(/\n$/, '');
-
-                if (!match) {
-                  return <code style={{ background: '#eee', padding: '2px 4px', borderRadius: 4 }}>{children}</code>;
-                }
-
-                const handleCopy = () => {
-                  navigator.clipboard.writeText(codeContent);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
-                };
-
-                return (
-                  <div style={{ margin: '16px 0', padding: '', borderRadius: 8, overflow: 'hidden', backgroundColor: '#1e1e1e' }}>
-
-                    {/* 代码顶部条：语言 + 复制按钮 */}
-                    <div
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', backgroundColor: '#2d2d2d', color: '#d1d5db', fontSize: 12 }}>
-                      <div
-                        onClick={() => setExpanded(!expanded)}
-                        style={{ fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 6 }}
-                      >
-                        {language}
-                        {/* 下拉箭头 */}
-                        <div
-                          style={{
-                            width: 0,
-                            height: 0,
-                            borderLeft: '4px solid transparent',
-                            borderRight: '4px solid transparent',
-                            borderBottom: '4px solid #d1d5db',
-                            transform: expanded ? 'rotate(180deg)' : 'rotate(0)',
-                            transition: 'transform 0.2s ease',
-                          }}
-                        />
-                      </div>
-                      <button
-                        onClick={handleCopy}
-                        style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer' }}
-                      >
-                        {copied ? 'copied' : 'copy'}
-                      </button>
-                    </div>
-                    <div
-                      style={{
-                        height: expanded ? 'auto' : 0,
-                        overflow: 'hidden',
-                        transition: 'height 0.3s ease',
-                      }}
-                    >
-                      {/* 代码块 */}
-                      <SyntaxHighlighter
-                        language={language}
-                        style={vscDarkPlus as any}
-                        PreTag="div"
-                      >
-                        {codeContent}
-                      </SyntaxHighlighter>
-                    </div>
-                  </div>
-                );
-              },
+              code: CodeBlock,
             }}
           >
             {message.content}

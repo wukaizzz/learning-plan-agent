@@ -4,20 +4,18 @@ import type { Message, ToolCall } from '../types/chat';
 import type { WorkflowEvent } from '../types/workflowEvents';
 
 export function useChat() {
-  const {
-    messages,
-    currentAgentId,
-    isStreaming,
-    addMessage,
-    clearMessages,
-    setCurrentAgent,
-    setStreaming,
-    updateToolCall,
-    updateLastAssistantMessage,
-    setCurrentWorkflowEvents, // 🆕
-    addWorkflowEvent, // 🆕
-    updateMessageWorkflowEvents // 🆕
-  } = useChatStore();
+  const messages = useChatStore(s => s.messages);
+  const currentAgentId = useChatStore(s => s.currentAgentId);
+  const isStreaming = useChatStore(s => s.isStreaming);
+  const addMessage = useChatStore(s => s.addMessage);
+  const clearMessages = useChatStore(s => s.clearMessages);
+  const setCurrentAgent = useChatStore(s => s.setCurrentAgent);
+  const setStreaming = useChatStore(s => s.setStreaming);
+  const updateToolCall = useChatStore(s => s.updateToolCall);
+  const updateLastAssistantMessage = useChatStore(s => s.updateLastAssistantMessage);
+  const setCurrentWorkflowEvents = useChatStore(s => s.setCurrentWorkflowEvents);
+  const addWorkflowEvent = useChatStore(s => s.addWorkflowEvent);
+  const updateMessageWorkflowEvents = useChatStore(s => s.updateMessageWorkflowEvents);
 
   const addUserMessage = useCallback((content: string) => {
     const message: Message = {

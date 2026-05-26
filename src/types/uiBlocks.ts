@@ -319,7 +319,7 @@ export interface UIBlock {
   id: string;                    // 唯一标识符
   type: BlockType;               // Block类型，决定渲染哪个组件
   title: string;                 // Block标题
-  props: Record<string, any>;     // 组件特定属性
+  props: Record<string, unknown>;     // 组件特定属性
   meta?: {                       // 元数据
     timestamp: number;           // 创建时间
     confidence?: number;         // 置信度 0-1
@@ -444,7 +444,7 @@ export interface ToolCallStatusProps {
     name: string;
     status: 'pending' | 'running' | 'completed' | 'failed';
     message?: string;
-    result?: any;
+    result?: unknown;
   }>;
 }
 
@@ -457,11 +457,11 @@ export interface CollectionFormProps {
     name: string;
     label: string;
     type: 'text' | 'number' | 'date' | 'select' | 'textarea';
-    value?: any;
+    value?: unknown;
     placeholder?: string;
     required?: boolean;
     options?: string[];
-    validation?: (value: any) => boolean;
+    validation?: (value: unknown) => boolean;
   }>;
   stepIndex?: number;
   totalSteps?: number;
@@ -540,7 +540,7 @@ export const AgentResponseSchema = z.object({
 export function createBlock(
   type: BlockType,
   title: string,
-  props: Record<string, any>,
+  props: Record<string, unknown>,
   meta?: { timestamp?: number; confidence?: number; agent?: string }
 ): UIBlock {
   return {

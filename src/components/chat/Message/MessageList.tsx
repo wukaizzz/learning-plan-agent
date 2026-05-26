@@ -4,7 +4,6 @@ import { MessageItem } from './MessageItem';
 import { useChatStore } from '../../../store/chatStore';
 
 import './MessageList.css';
-import { logger } from '@/logger';
 
 interface MessageListProps {
   messages: Message[];
@@ -41,19 +40,18 @@ export const MessageList: React.FC<MessageListProps> = ({
         isNewSessionRef.current = false;
       }
     }
-  }, [currentSessionId, getScrollPosition, messages.length]);
+  }, [currentSessionId, getScrollPosition, messages.length, saveScrollPosition]);
 
-  // 🆕 组件卸载时保存当前滚动位置（使用 ref + 空依赖数组）
+  // 🆕 组件卸载时保存当前滚动位置
   useEffect(() => {
+    const sessionId = currentSessionId;
+    const container = messagesContainerRef.current;
     return () => {
-      if (currentSessionId) {
-        const container = messagesContainerRef.current;
-        if (container) {
-          saveScrollPosition(currentSessionId, container.scrollTop);
-        }
+      if (sessionId && container) {
+        saveScrollPosition(sessionId, container.scrollTop);
       }
     };
-  }, []); // ✅ 空依赖数组，只在卸载时执行一次
+  }, [currentSessionId, saveScrollPosition]);
 
   // 🆕 实时保存滚动位置（用于会话切换时保存位置）
   useEffect(() => {
@@ -133,13 +131,6 @@ export const MessageList: React.FC<MessageListProps> = ({
       {messages.map((message) => {
         const isUser = message.role === 'user';
         const messageClassName = isUser ? 'message-wrapper-sticky' : 'message-wrapper';
-        logger.info(
-          { 
-            Component: "MessageList",
-            messagesList: messages
-          }, 
-          'MessageList detail'
-        );
         return (
           <div
             key={message.id}

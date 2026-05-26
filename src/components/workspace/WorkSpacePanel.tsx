@@ -368,7 +368,7 @@ export const WorkSpacePanel: React.FC = () => {
             <select
               className="sort-dropdown"
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
+              onChange={(e) => setSortBy(e.target.value as 'recent' | 'deadline' | 'progress')}
             >
               <option value="recent">最近更新</option>
               <option value="deadline">考试时间</option>

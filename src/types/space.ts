@@ -114,5 +114,5 @@ export interface SpaceStore {
   getDeletedSpaces: () => StudySpace[];                 // 获取已删除的空间列表
 
   // 🆕 字段更新相关
-  updateSpaceFields: (spaceId: string, fieldsData: Record<string, any>) => void;  // 更新特定字段（支持嵌套路径）
+  updateSpaceFields: (spaceId: string, fieldsData: Record<string, unknown>) => void;  // 更新特定字段（支持嵌套路径）
 }

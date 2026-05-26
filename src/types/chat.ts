@@ -59,7 +59,7 @@ export interface ChatStore {
   uiBlocks: UIBlock[]; // 🆕 当前显示的 UI Blocks
   sessions: ChatSession[];
   activeFormStep: number; // 🆕 当前激活的表单步骤索引
-  formStepsData: Record<number, Record<string, any>>; // 🆕 已提交的表单数据
+  formStepsData: Record<number, Record<string, unknown>>; // 🆕 已提交的表单数据
   workflowInterrupted: boolean; // 🆕 工作流是否中断
   lastFormStep: number | null; // 🆕 中断时的表单步骤
   currentWorkflowEvents: WorkflowEvent[]; // 🆕 当前消息的工作流事件
@@ -104,7 +104,7 @@ export interface ChatStore {
 
   // 🆕 Multi-form collection management
   setActiveFormStep: (step: number) => void; // 设置当前激活的表单步骤
-  submitFormStep: (stepIndex: number, data: Record<string, any>) => void; // 提交表单步骤
+  submitFormStep: (stepIndex: number, data: Record<string, unknown>) => void; // 提交表单步骤
   markWorkflowInterrupted: (step: number) => void; // 标记工作流中断
   resetFormCollection: () => void; // 重置表单收集状态
   isFormCollectionComplete: () => boolean; // 检查所有表单是否完成

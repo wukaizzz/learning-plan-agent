@@ -20,7 +20,7 @@ export const ThinkingBlock: React.FC<ThinkingBlockProps> = ({
 
   useEffect(() => {
     if (_thinkingActive && !prevActiveRef.current) {
-      setIsExpanded(true);
+      setIsExpanded(true); // eslint-disable-line react-hooks/set-state-in-effect
     }
     if (!_thinkingActive && prevActiveRef.current && _thinkingDuration !== undefined) {
       setIsExpanded(false);

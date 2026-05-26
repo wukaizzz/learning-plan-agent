@@ -119,7 +119,7 @@ export const EditSpaceForm: React.FC<EditSpaceFormProps> = ({
             <select
               className="form-select"
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as StudySpace['status'] })}
             >
               <option value="planning">📋 规划中</option>
               <option value="active">▶️ 进行中</option>

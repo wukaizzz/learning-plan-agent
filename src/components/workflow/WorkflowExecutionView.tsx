@@ -10,7 +10,7 @@
  * - 优雅的视觉反馈
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { WorkflowStepCard } from './WorkflowStepCard';
 import { WorkflowProgressBar } from './WorkflowProgressBar';
 import type { WorkflowEvent, ToolCallEvent, AnalysisResultEvent } from '@/types/workflowEvents';
@@ -46,19 +46,19 @@ export const WorkflowExecutionView: React.FC<WorkflowExecutionViewProps> = ({
   isStreaming = false,
   onComplete
 }) => {
-  const [steps, setSteps] = useState<ExecutionStep[]>([]);
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
-  const [overallProgress, setOverallProgress] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 处理工作流事件
-  useEffect(() => {
+  const [now] = useState(() => Date.now());
+
+  // Derive steps from events
+  const steps = useMemo(() => {
     const newSteps: ExecutionStep[] = [];
 
     events.forEach((event, index) => {
       const baseStep: Partial<ExecutionStep> = {
         id: `step-${index}`,
-        timestamp: Date.now()
+        timestamp: now
       };
 
       switch (event.type) {
@@ -84,14 +84,14 @@ export const WorkflowExecutionView: React.FC<WorkflowExecutionViewProps> = ({
           } as ExecutionStep);
           break;
 
-        case 'tool_call':
+        case 'tool_call': {
           const toolEvent = event as ToolCallEvent;
           newSteps.push({
             ...baseStep,
             type: 'tool_call',
             title: `调用工具: ${toolEvent.toolName}`,
             description: getToolDescription(toolEvent),
-            status: toolEvent.status === 'pending' ? 'pending' : 
+            status: toolEvent.status === 'pending' ? 'pending' :
                      toolEvent.status === 'executing' ? 'running' :
                      toolEvent.status === 'completed' ? 'completed' : 'failed',
             toolName: toolEvent.toolName,
@@ -100,8 +100,9 @@ export const WorkflowExecutionView: React.FC<WorkflowExecutionViewProps> = ({
             error: toolEvent.error
           } as ExecutionStep);
           break;
+        }
 
-        case 'analysis_result':
+        case 'analysis_result': {
           const analysisEvent = event as AnalysisResultEvent;
           newSteps.push({
             ...baseStep,
@@ -115,6 +116,7 @@ export const WorkflowExecutionView: React.FC<WorkflowExecutionViewProps> = ({
             ]
           } as ExecutionStep);
           break;
+        }
 
         case 'info_needed':
           newSteps.push({
@@ -129,26 +131,33 @@ export const WorkflowExecutionView: React.FC<WorkflowExecutionViewProps> = ({
       }
     });
 
-    setSteps(newSteps);
+    return newSteps;
+  }, [events, currentStep, now]);
 
-    // 计算整体进度
-    const completedSteps = newSteps.filter(s => s.status === 'completed').length;
-    const progress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
-    setOverallProgress(progress);
+  // Derive progress from steps
+  const overallProgress = useMemo(() => {
+    const completedSteps = steps.filter(s => s.status === 'completed').length;
+    return totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+  }, [steps, totalSteps]);
 
-    // 自动展开正在运行的步骤
-    const runningStepId = newSteps.find(s => s.status === 'running')?.id;
+  // Auto-expand running steps
+  useEffect(() => {
+    const runningStepId = steps.find(s => s.status === 'running')?.id;
     if (runningStepId) {
-      setExpandedSteps(prev => new Set([...prev, runningStepId]));
+      setExpandedSteps(prev => new Set([...prev, runningStepId])); // eslint-disable-line react-hooks/set-state-in-effect
     }
+  }, [steps]);
 
-    // 检查是否完成
-    if (!isStreaming && completedSteps === newSteps.length && newSteps.length > 0) {
-      setTimeout(() => {
+  // Check completion
+  useEffect(() => {
+    const completedSteps = steps.filter(s => s.status === 'completed').length;
+    if (!isStreaming && completedSteps === steps.length && steps.length > 0) {
+      const timer = setTimeout(() => {
         onComplete?.();
       }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [events, currentStep, totalSteps, isStreaming, onComplete]);
+  }, [steps, isStreaming, onComplete]);
 
   // 自动滚动到最新步骤
   useEffect(() => {

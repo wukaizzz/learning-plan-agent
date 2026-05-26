@@ -3,7 +3,7 @@ import { useChat } from './useChat';
 import { useAgent } from './useAgent';
 import { useChatStore } from '../store/chatStore';
 import { API_ENDPOINT } from '../utils/constants';
-import type { Message } from '../types/chat';
+import type { Message, ToolCall } from '../types/chat';
 import type { WorkflowStepEvent, InfoNeededEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, UIBlockUpdateEvent, ThinkingEvent, ThinkingEndEvent, IntentRoutedEvent, WorkflowEvent } from '../types/workflowEvents';
 
 const createClientId = (prefix: string) => {
@@ -28,7 +28,7 @@ export function useStream() {
     updateMessageWorkflowEvents
   } = useChatStore();
   const currentMessageRef = useRef<string>('');
-  const currentToolCallsRef = useRef<any[]>([]);
+  const currentToolCallsRef = useRef<ToolCall[]>([]);
   const hasStartedStreaming = useRef<boolean>(false);
   const currentMessageIdRef = useRef<string | null>(null);
   const activeRunIdRef = useRef<string | null>(null);
@@ -71,11 +71,17 @@ export function useStream() {
   const handleToolCall = useCallback((event: ToolCallEvent) => {
     console.log('🔧 Tool call:', event);
     // 更新工具调用状态
-    const toolCallData = {
+    const statusMap: Record<string, ToolCall['status']> = {
+      pending: 'pending',
+      executing: 'pending',
+      completed: 'completed',
+      failed: 'failed'
+    };
+    const toolCallData: ToolCall = {
       id: `tool_${Date.now()}`,
       tool_name: event.toolName,
       parameters: event.parameters,
-      status: event.status,
+      status: statusMap[event.status] || 'pending',
       result: event.result,
       error: event.error
     };
@@ -98,7 +104,7 @@ export function useStream() {
     isThinkingActive.current = true;
   }, []);
 
-  const handleThinkingEnd = useCallback((_event: ThinkingEndEvent) => {
+  const handleThinkingEnd = useCallback((_event: ThinkingEndEvent) => { // eslint-disable-line @typescript-eslint/no-unused-vars
     isThinkingActive.current = false;
     currentThinkingRef.current = '';
   }, []);
@@ -412,7 +418,7 @@ export function useStream() {
         abortControllerRef.current = null;
       }
     }
-  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, currentSpaceId, ensureAssistantMessage, handleIntentRouted, appendCurrentWorkflowEvent, setCurrentWorkflowEvents]); // 🆕 添加依赖
+  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, currentSpaceId, ensureAssistantMessage, handleIntentRouted, appendCurrentWorkflowEvent, setCurrentWorkflowEvents, handleWorkflowStep, handleInfoNeeded, handleToolCall, handleProcessing, handleAnalysisResult, handleUIBlockUpdate, handleThinking, handleThinkingEnd]);
 
   const executeTool = useCallback(async (
     toolCallId: string,

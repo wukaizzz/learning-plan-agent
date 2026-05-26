@@ -73,7 +73,7 @@ export const ToolCallStatus: React.FC<ToolCallStatusComponentProps> = ({
                   <div className="step-message">{step.message}</div>
                 )}
 
-                {step.result && (
+                {step.result != null && (
                   <div className="step-result">
                     <details>
                       <summary className="result-summary">查看结果</summary>

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * Block Registry - Schema-Driven UI 组件渲染系统
  *
@@ -87,6 +88,7 @@ const flattenFieldNames = (fields: FormField[]): FormField[] => {
  *
  * TODO: 在实现完各个组件后，取消对应的注释并替换 PlaceholderBlock
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- component registry needs flexible prop types
 const BLOCK_REGISTRY: Record<string, React.ComponentType<any>> = {
   'summary-card': SummaryCard, // ✅ 已实现
   'daily-task-list': DailyTaskList, // ✅ 已实现
@@ -131,7 +133,8 @@ export const renderBlock = (
 
   // 特殊处理 collection-form - 传递上下文信息
   if (block.type === 'collection-form' && context?.onSubmit) {
-    const flattenedFields = flattenFieldNames(block.props.fields || []);
+    const props = block.props as Record<string, unknown>;
+    const flattenedFields = flattenFieldNames((props.fields as import('@/components/ui-blocks/CollectionForm').FormField[]) || []);
 
     return React.createElement(CollectionForm, {
       ...block.props,
@@ -141,9 +144,9 @@ export const renderBlock = (
       onSubmit: context.onSubmit,
       isLoading: context.isLoading,
       externalError: context.error,
-      stepIndex: context.stepIndex ?? block.props.stepIndex ?? 0,
-      totalSteps: context.totalSteps ?? block.props.totalSteps ?? 1,
-      showProgress: context.showProgress ?? block.props.showProgress ?? false
+      stepIndex: context.stepIndex ?? (props.stepIndex as number) ?? 0,
+      totalSteps: context.totalSteps ?? (props.totalSteps as number) ?? 1,
+      showProgress: context.showProgress ?? (props.showProgress as boolean) ?? false
     });
   }
 
@@ -187,6 +190,7 @@ export const renderBlocks = (
  */
 export const registerBlockComponent = (
   blockType: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic component registration
   component: React.ComponentType<any>
 ): void => {
   BLOCK_REGISTRY[blockType] = component;

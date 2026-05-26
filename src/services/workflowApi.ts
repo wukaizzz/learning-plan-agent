@@ -130,7 +130,7 @@ export interface UIBlock {
   id: string;
   type: string;
   title?: string;
-  props: Record<string, any>;
+  props: Record<string, unknown>;
   order?: number;
 }
 
@@ -203,7 +203,7 @@ export async function startPlanning(
  */
 export async function resumeWorkflow(
   threadId: string,
-  userInput: Record<string, any>
+  userInput: Record<string, unknown>
 ): Promise<WorkflowResponse> {
   try {
     const response = await fetch(`${API_ENDPOINT}/workflows/${threadId}/resume`, {
@@ -345,10 +345,10 @@ export function mapWorkflowStage(stage: string): 'empty' | 'collecting' | 'analy
 /**
  * 将后端的 UIBlock 转换为前端 UIBlock 格式
  */
-export function transformUIBlock(block: any): import('@/types/uiBlocks').UIBlock {
+export function transformUIBlock(block: { id: string; type: string; title?: string; props?: Record<string, unknown>; order?: number }): import('@/types/uiBlocks').UIBlock {
   return {
     id: block.id,
-    type: block.type as any,
+    type: block.type as import('@/types/uiBlocks').BlockType,
     title: block.title || '',
     props: block.props || {},
     meta: {

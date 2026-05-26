@@ -64,7 +64,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   useEffect(() => {
     if (currentSessionId) {
       const draft = getSessionDraft(currentSessionId);
-      setCurrentDraft(draft);
+      setCurrentDraft(draft); // eslint-disable-line react-hooks/set-state-in-effect
 
       // 更新textarea的值和高度
       if (textareaRef.current) {
@@ -78,7 +78,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         }
       }
     }
-  }, [currentSessionId]); // 只依赖currentSessionId
+  }, [currentSessionId, getSessionDraft]);
 
   // 组件卸载时清理定时器
   useEffect(() => {

@@ -3,7 +3,7 @@
  * 显示单个学习空间的详细信息
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { StudySpace } from '../../../types/space';
 import { useSpaceStore } from '../../../store/spaceStore';
@@ -33,11 +33,11 @@ export const SpaceCard: React.FC<SpaceCardProps> = ({ space }) => {
     });
   };
   // 格式化更新时间
+  const [now] = useState(() => Date.now());
   const formatUpdateTime = (time: Date | number) => {
     const date = time instanceof Date ? time : new Date(time);
     const timestamp = date.getTime();
 
-    const now = Date.now();
     const diff = now - timestamp;
 
     const minutes = Math.floor(diff / 60000);

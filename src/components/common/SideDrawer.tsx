@@ -38,7 +38,7 @@ export const SideDrawer: React.FC<SideDrawerProps> = ({
 
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   // 处理焦点管理
   useEffect(() => {
