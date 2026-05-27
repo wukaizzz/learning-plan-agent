@@ -22,7 +22,8 @@ export function useChat() {
       id: `msg-${Date.now()}`,
       role: 'user',
       content,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      thinkingActive: false
     };
     addMessage(message);
     return message;
@@ -36,6 +37,7 @@ export function useChat() {
       content,
       timestamp: Date.now(),
       tool_calls: toolCalls,
+      thinkingActive: false,
       ...extras,
       workflow_events: extras?.workflow_events ?? bufferedWorkflowEvents
     };

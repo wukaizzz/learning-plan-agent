@@ -31,6 +31,7 @@ export interface Message {
   form_submission_state?: 'idle' | 'submitting' | 'submitted';
   workflow_process_steps?: WorkflowProcessStep[];
   workflow_events?: WorkflowEvent[];
+  thinkingActive: boolean;
   thinkingContent?: string;
   thinkingDuration?: number;
   agent_execution?: AgentExecutionState;
@@ -89,6 +90,11 @@ export interface ChatStore {
   setStreaming: (isStreaming: boolean) => void;
   updateToolCall: (toolCallId: string, updates: Partial<ToolCall>) => void;
   updateMessage: (messageId: string, content: string) => void;
+  updateMessageThinking: (messageId: string, patch: {
+    content?: string;
+    active?: boolean;
+    duration?: number;
+  }) => void;
   deleteMessage: (messageId: string) => void;
   addToolCall: (messageId: string, toolCall: ToolCall) => void;
   updateLastAssistantMessage: (content: string) => void;

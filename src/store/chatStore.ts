@@ -38,12 +38,19 @@ const createLegacySession = (
     id: currentSessionId || generateId(),
     spaceId: currentSpaceId,
     title: messages.find(message => message.role === 'user')?.content.slice(0, 30) || '历史对话',
-    messages,
+    messages: messages.map(message => ({
+      ...message,
+      thinkingActive: message.thinkingActive ?? false
+    })),
     createdAt: now,
     updatedAt: now,
     draftMessage: '',
     scrollPosition: 0
   };
+};
+
+const normalizeMessageRuntimeFields = (message: Message) => {
+  message.thinkingActive ??= false;
 };
 
 export const useChatStore = create<ChatStore>()(
@@ -64,6 +71,7 @@ export const useChatStore = create<ChatStore>()(
       currentWorkflowEvents: [], // 🆕 当前消息的工作流事件
 
       addMessage: (message: Message) => set((state) => {
+        normalizeMessageRuntimeFields(message);
         traceAgent({
           layer: 'frontend:messageStore', label: 'addMessage',
           messageId: message.id,
@@ -157,6 +165,27 @@ export const useChatStore = create<ChatStore>()(
         updateSessionMessage(state.sessions, state.currentSessionId, messageId, sessionMessage => {
           sessionMessage.content = content;
         });
+      }),
+
+      updateMessageThinking: (messageId, patch) => set((state) => {
+        const applyThinkingPatch = (message: Message) => {
+          if (patch.content !== undefined) {
+            message.thinkingContent = patch.content;
+          }
+          if (patch.active !== undefined) {
+            message.thinkingActive = patch.active;
+          }
+          if (patch.duration !== undefined) {
+            message.thinkingDuration = patch.duration;
+          }
+        };
+
+        const message = state.messages.find(msg => msg.id === messageId);
+        if (message) {
+          applyThinkingPatch(message);
+        }
+
+        updateSessionMessage(state.sessions, state.currentSessionId, messageId, applyThinkingPatch);
       }),
 
       deleteMessage: (messageId: string) => set((state) => {
@@ -663,6 +692,10 @@ export const useChatStore = create<ChatStore>()(
         if (!state) {
           return;
         }
+
+        state.sessions.forEach(session => {
+          session.messages.forEach(normalizeMessageRuntimeFields);
+        });
 
         const currentSession = state.currentSessionId
           ? state.sessions.find(session => session.id === state.currentSessionId)

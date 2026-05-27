@@ -276,9 +276,7 @@ function createProcessSteps(events: WorkflowEvent[]): AgentProgressStep[] {
 const EVENTS_DUPLICATED_BY_AGENT_EXECUTION = new Set([
   'workflow_step',
   'ui_block_update',
-  'analysis_result',
-  'thinking',
-  'thinking_end'
+  'analysis_result'
 ]);
 
 export const WorkflowEvents: React.FC<WorkflowEventsProps> = ({
@@ -288,8 +286,11 @@ export const WorkflowEvents: React.FC<WorkflowEventsProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const filteredEvents = useMemo(() => {
-    if (!hasAgentExecution) return events;
-    return events.filter(e => !EVENTS_DUPLICATED_BY_AGENT_EXECUTION.has(e.type));
+    const withoutThinking = events.filter(
+      e => e.type !== 'thinking' && e.type !== 'thinking_end'
+    );
+    if (!hasAgentExecution) return withoutThinking;
+    return withoutThinking.filter(e => !EVENTS_DUPLICATED_BY_AGENT_EXECUTION.has(e.type));
   }, [events, hasAgentExecution]);
   const steps = useMemo(() => createProcessSteps(filteredEvents), [filteredEvents]);
 

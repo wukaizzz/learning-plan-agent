@@ -85,7 +85,8 @@ export function useStream() {
     currentSpaceId,
     setCurrentWorkflowEvents,
     addWorkflowEvent,
-    updateMessageWorkflowEvents
+    updateMessageWorkflowEvents,
+    updateMessageThinking
   } = useChatStore();
   const currentMessageRef = useRef<string>('');
   const currentToolCallsRef = useRef<ToolCall[]>([]);
@@ -95,6 +96,9 @@ export function useStream() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const currentThinkingRef = useRef<string>('');
   const isThinkingActive = useRef<boolean>(false);
+  const thinkingFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingThinkingMessageIdRef = useRef<string | null>(null);
+  const thinkingEndedRef = useRef<boolean>(false);
 
   // 工作流事件处理函数
   const handleWorkflowStep = useCallback((event: WorkflowStepEvent) => {
@@ -163,16 +167,69 @@ export function useStream() {
     }
   }, []);
 
-  const handleThinking = useCallback((event: ThinkingEvent) => {
-    if (!event.content && event.content !== '') return;
-    currentThinkingRef.current += event.content;
-    isThinkingActive.current = true;
+  const clearThinkingFlushTimer = useCallback(() => {
+    if (thinkingFlushTimerRef.current) {
+      clearTimeout(thinkingFlushTimerRef.current);
+    }
+    thinkingFlushTimerRef.current = null;
   }, []);
 
-  const handleThinkingEnd = useCallback((_event: ThinkingEndEvent) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+  const flushThinking = useCallback((messageId: string, active = true) => {
+    clearThinkingFlushTimer();
+    pendingThinkingMessageIdRef.current = null;
+
+    if (!currentThinkingRef.current && !active) {
+      return;
+    }
+
+    const patch: Parameters<typeof updateMessageThinking>[1] = { active };
+    if (currentThinkingRef.current) {
+      patch.content = currentThinkingRef.current;
+    }
+    updateMessageThinking(messageId, patch);
+  }, [clearThinkingFlushTimer, updateMessageThinking]);
+
+  const scheduleThinkingFlush = useCallback((messageId: string) => {
+    pendingThinkingMessageIdRef.current = messageId;
+    if (thinkingFlushTimerRef.current) return;
+
+    thinkingFlushTimerRef.current = setTimeout(() => {
+      if (pendingThinkingMessageIdRef.current) {
+        flushThinking(pendingThinkingMessageIdRef.current);
+      }
+    }, 100);
+  }, [flushThinking]);
+
+  const resetThinkingBuffer = useCallback((initialContent = '') => {
+    clearThinkingFlushTimer();
+    pendingThinkingMessageIdRef.current = null;
+    currentThinkingRef.current = initialContent;
     isThinkingActive.current = false;
-    currentThinkingRef.current = '';
-  }, []);
+    thinkingEndedRef.current = !!initialContent;
+  }, [clearThinkingFlushTimer]);
+
+  const handleThinking = useCallback((event: ThinkingEvent, messageId: string) => {
+    if (!event.content) return;
+
+    if (currentThinkingRef.current && thinkingEndedRef.current) {
+      currentThinkingRef.current += '\n\n---\n\n';
+    }
+
+    thinkingEndedRef.current = false;
+    currentThinkingRef.current += event.content;
+    isThinkingActive.current = true;
+    scheduleThinkingFlush(messageId);
+  }, [scheduleThinkingFlush]);
+
+  const handleThinkingEnd = useCallback((event: ThinkingEndEvent, messageId: string) => {
+    flushThinking(messageId, false);
+    isThinkingActive.current = false;
+    thinkingEndedRef.current = true;
+
+    if (event.duration > 0) {
+      updateMessageThinking(messageId, { duration: event.duration });
+    }
+  }, [flushThinking, updateMessageThinking]);
 
   const handleProcessing = useCallback((event: ProcessingEvent) => {
     console.log('⚙️ Processing:', event);
@@ -367,7 +424,7 @@ export function useStream() {
   }, [addAssistantMessage]);
 
   const appendCurrentWorkflowEvent = useCallback((event: WorkflowEvent) => {
-    if (event.runId && event.runId !== activeRunIdRef.current) {
+    if (event.runId && activeRunIdRef.current && event.runId !== activeRunIdRef.current) {
       return;
     }
 
@@ -403,8 +460,7 @@ export function useStream() {
     currentMessageIdRef.current = assistantMessageId;
     currentMessageRef.current = '';
     currentToolCallsRef.current = [];
-    currentThinkingRef.current = '';
-    isThinkingActive.current = false;
+    resetThinkingBuffer();
     hasStartedStreaming.current = false;
     setCurrentWorkflowEvents([]);
     traceAgent({
@@ -539,14 +595,18 @@ export function useStream() {
 
                 case 'thinking':
                   ensureAssistantMessage();
-                  handleThinking(chunk);
                   appendCurrentWorkflowEvent(chunk);
+                  if (currentMessageIdRef.current) {
+                    handleThinking(chunk, currentMessageIdRef.current);
+                  }
                   break;
 
                 case 'thinking_end':
                   ensureAssistantMessage();
-                  handleThinkingEnd(chunk);
                   appendCurrentWorkflowEvent(chunk);
+                  if (currentMessageIdRef.current) {
+                    handleThinkingEnd(chunk, currentMessageIdRef.current);
+                  }
                   break;
 
                 case 'agent_execution_start':
@@ -607,6 +667,10 @@ export function useStream() {
           label: 'streamResponse cleanup',
           data: { runId }
         });
+        if (currentMessageIdRef.current) {
+          flushThinking(currentMessageIdRef.current, false);
+        }
+        resetThinkingBuffer();
         setStreaming(false);
         setCurrentWorkflowEvents([]);
         currentMessageIdRef.current = null; // 🆕 清空消息ID
@@ -614,7 +678,7 @@ export function useStream() {
         abortControllerRef.current = null;
       }
     }
-  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, currentSpaceId, ensureAssistantMessage, handleIntentRouted, appendCurrentWorkflowEvent, setCurrentWorkflowEvents, handleWorkflowStep, handleInfoNeeded, handleToolCall, handleProcessing, handleAnalysisResult, handleUIBlockUpdate, handleThinking, handleThinkingEnd]);
+  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, currentSpaceId, ensureAssistantMessage, handleIntentRouted, appendCurrentWorkflowEvent, setCurrentWorkflowEvents, handleWorkflowStep, handleInfoNeeded, handleToolCall, handleProcessing, handleAnalysisResult, handleUIBlockUpdate, handleThinking, handleThinkingEnd, flushThinking, resetThinkingBuffer]);
 
   const streamResume = useCallback(async (params: {
     threadId: string;
@@ -625,6 +689,8 @@ export function useStream() {
     const { threadId, messageId, executionId, formData } = params;
 
     currentMessageIdRef.current = messageId;
+    const existingMessage = useChatStore.getState().messages.find(m => m.id === messageId);
+    resetThinkingBuffer(existingMessage?.thinkingContent || '');
     traceAgent({
       layer: 'frontend:useStream',
       label: 'streamResume started',
@@ -677,10 +743,12 @@ export function useStream() {
             break;
           }
           case 'thinking':
-            handleThinking(chunk);
+            appendCurrentWorkflowEvent(chunk);
+            handleThinking(chunk, messageId);
             break;
           case 'thinking_end':
-            handleThinkingEnd(chunk);
+            appendCurrentWorkflowEvent(chunk);
+            handleThinkingEnd(chunk, messageId);
             break;
           case 'error':
             console.error('Resume stream error:', chunk.error);
@@ -702,9 +770,11 @@ export function useStream() {
         executionId,
         data: { finalized, interrupted }
       });
+      flushThinking(messageId, false);
+      resetThinkingBuffer();
       setStreaming(false);
     }
-  }, [setStreaming, handleAgentStepUpdate, handleAgentExecutionFinish, handleWorkflowStep, handleInfoNeeded, handleUIBlockUpdate, handleThinking, handleThinkingEnd]);
+  }, [setStreaming, handleAgentStepUpdate, handleAgentExecutionFinish, handleWorkflowStep, handleInfoNeeded, handleUIBlockUpdate, handleThinking, handleThinkingEnd, appendCurrentWorkflowEvent, flushThinking, resetThinkingBuffer]);
 
   const executeTool = useCallback(async (
     toolCallId: string,

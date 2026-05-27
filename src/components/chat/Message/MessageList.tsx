@@ -86,22 +86,6 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
   }, [messages.length]);
 
-  // 流式输出时持续滚动到底部
-  useEffect(() => {
-    if (isStreaming && messagesContainerRef.current) {
-      const scrollToBottom = () => {
-        if (messagesContainerRef.current) {
-          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-        }
-      };
-
-      // 每200ms滚动一次确保跟上内容生成
-      const intervalId = setInterval(scrollToBottom, 200);
-
-      return () => clearInterval(intervalId);
-    }
-  }, [isStreaming]);
-
   if (messages.length === 0) {
     return (
       <div className="message-list-empty">
@@ -126,6 +110,22 @@ export const MessageList: React.FC<MessageListProps> = ({
     );
   }
 
+  const lastAssistantMessage = [...messages].reverse().find(message => message.role === 'assistant');
+  const hasVisibleWorkflowEvents = lastAssistantMessage?.workflow_events?.some(
+    event => event.type !== 'thinking' && event.type !== 'thinking_end'
+  );
+  const shouldShowStreamingDots = isStreaming && (
+    !lastAssistantMessage ||
+    (
+      !lastAssistantMessage.content &&
+      !lastAssistantMessage.thinkingContent &&
+      !(lastAssistantMessage.ui_blocks?.length) &&
+      !hasVisibleWorkflowEvents &&
+      !(lastAssistantMessage.tool_calls?.length) &&
+      !lastAssistantMessage.agent_execution
+    )
+  );
+
   return (
     <div className="message-list" ref={messagesContainerRef}>
       {messages.map((message) => {
@@ -143,7 +143,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           </div>
         );
       })}
-      {isStreaming && (
+      {shouldShowStreamingDots && (
         <div className="message-streaming">
           <div className="message-streaming-dots">
             <div className="message-streaming-dot" style={{ animationDelay: '0ms' }} />
