@@ -3,10 +3,19 @@
  * 显示单个学习空间的详细信息
  */
 
-import React, { useState } from 'react';
+import React from 'react';
+import { ArrowRight, BookOpen, CalendarDays, CheckSquare, Clock3, Flame } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import type { StudySpace } from '../../../types/space';
-import { useSpaceStore } from '../../../store/spaceStore';
+import { CircularProgress } from '@/components/common';
+import type { StudySpace } from '@/types/space';
+import { useSpaceStore } from '@/store/spaceStore';
+import {
+  clampProgress,
+  formatGoalDate,
+  getSpaceAdvice,
+  getTodayTaskLabel,
+  getWorkspaceStatusConfig
+} from '../workspaceDashboardUtils';
 import './SpaceCard.css';
 
 interface SpaceCardProps {
@@ -16,30 +25,20 @@ interface SpaceCardProps {
 export const SpaceCard: React.FC<SpaceCardProps> = ({ space }) => {
   const navigate = useNavigate();
   const { switchSpace } = useSpaceStore();
+  const statusConfig = getWorkspaceStatusConfig(space.status);
+  const progress = clampProgress(space.stats.overallProgress);
+  const advice = getSpaceAdvice(space);
 
-  // 处理卡片点击事件
   const handleCardClick = () => {
-    // 切换当前空间
     switchSpace(space.id);
-    // 跳转到对应的聊天页面
     navigate(`/workSpace/${space.id}`);
   };
-  // 格式化考试日期
-  const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
-  };
-  // 格式化更新时间
-  const [now] = useState(() => Date.now());
-  const formatUpdateTime = (time: Date | number) => {
-    const date = time instanceof Date ? time : new Date(time);
-    const timestamp = date.getTime();
 
-    const diff = now - timestamp;
+  const formatUpdateTime = (time: Date | string | number) => {
+    const timestamp = new Date(time).getTime();
+    if (!Number.isFinite(timestamp)) return '最近';
 
+    const diff = Date.now() - timestamp;
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
@@ -50,129 +49,106 @@ export const SpaceCard: React.FC<SpaceCardProps> = ({ space }) => {
     return `${days} 天前`;
   };
 
-  // 获取状态配置
-  const getStatusConfig = () => {
-    switch (space.status) {
-      case 'active':
-        return {
-          label: '进行中',
-          className: 'status-active',
-          borderColor: '#10b981',
-          bgColor: '#d1fae5',
-          textColor: '#065f46'
-        };
-      case 'planning':
-        return {
-          label: '即将开始',
-          className: 'status-upcoming',
-          borderColor: '#f59e0b',
-          bgColor: '#fef3c7',
-          textColor: '#92400e'
-        };
-      case 'completed':
-        return {
-          label: '已完成',
-          className: 'status-completed',
-          borderColor: '#8b5cf6',
-          bgColor: '#ede9fe',
-          textColor: '#6d28d9'
-        };
-      case 'paused':
-        return {
-          label: '已暂停',
-          className: 'status-paused',
-          borderColor: '#9ca3af',
-          bgColor: '#f3f4f6',
-          textColor: '#4b5563'
-        };
-      default:
-        return {
-          label: '规划中',
-          className: 'status-planning',
-          borderColor: '#6366f1',
-          bgColor: '#e0e7ff',
-          textColor: '#4338ca'
-        };
-    }
-  };
-
-  // 获取学科标签
-  const getSubjectTags = () => {
-    return space.subjects.slice(0, 3).map(subject => subject.name);
-  };
-
-  // 获取卡片颜色
-  const getCardStyle = () => {
-    return {
-      borderLeftColor: space.color,
-      borderTopColor: space.color
-    };
-  };
-
-  const statusConfig = getStatusConfig();
-  const subjectTags = getSubjectTags();
+  const totalStudyHours = space.stats.totalStudyHours > 0
+    ? `${space.stats.totalStudyHours} 小时`
+    : '待累计';
 
   return (
-    <div className="space-card" style={getCardStyle()} onClick={handleCardClick}>
-      {/* 状态标签 */}
-      <div className={`space-card-status ${statusConfig.className}`}>
-        {statusConfig.label}
+    <div
+      className={`space-card ${statusConfig.className}`}
+      style={{
+        '--space-accent': statusConfig.color,
+        '--space-border': statusConfig.border,
+        '--space-soft': statusConfig.softBg,
+        '--space-surface': statusConfig.surface,
+        '--space-shadow': statusConfig.shadow
+      } as React.CSSProperties}
+      onClick={handleCardClick}
+    >
+      <div className="space-card-cover">
+        <span className="space-card-status">{statusConfig.label}</span>
+        <div className="space-card-cover-art">
+          <BookOpen size={44} />
+        </div>
       </div>
 
-      {/* 卡片内容 */}
       <div className="space-card-content">
-        {/* 顶部图标区 */}
-        <div className="space-card-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L2 7V17C2 18.1046 2.89543 19 4 19H20C21.1046 19 22 18.1046 22 17V7C22 2.89543 21.1046 2 20 2H12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M12 6V12M12 16H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-        </div>
-
-        {/* 主标题 */}
-        <h3 className="space-card-title">{space.name}</h3>
-
-        {/* 目标日期 */}
-        <div className="space-card-date">
-          目标日期：{formatDate(space.goal.examDate)}
-        </div>
-
-        {/* 进度条 */}
-        <div className="space-card-progress">
-          <div className="progress-info">
-            <div className="progress-bar">
-              <div
-                className="progress-fill"
-                style={{
-                  width: `${space.stats.overallProgress}%`,
-                  backgroundColor: statusConfig.borderColor
-                }}
-              />
+        <div className="space-card-header">
+          <div className="space-card-title-group">
+            <h3 className="space-card-title">{space.name}</h3>
+            <div className="space-card-date">
+              <CalendarDays size={15} />
+              目标日期：{formatGoalDate(space.goal.examDate)}
             </div>
-            <span className="progress-text">{space.stats.overallProgress}%</span>
+          </div>
+          <CircularProgress
+            value={progress}
+            size={68}
+            strokeWidth={8}
+            color={statusConfig.color}
+            trackColor="#e5e7eb"
+          />
+        </div>
+
+        <p className="space-card-description">
+          {space.description || space.goal.primaryGoal || '保持学习节奏，稳步推进当前目标。'}
+        </p>
+
+        <div className="space-card-progress">
+          <div className="progress-label-row">
+            <span>整体进度</span>
+            <strong>{progress}%</strong>
+          </div>
+          <div className="progress-bar">
+            <div className="progress-fill" style={{ width: `${progress}%` }} />
           </div>
         </div>
 
-        {/* 学科标签 */}
-        <div className="space-card-tags">
-          {subjectTags.map((tag, index) => (
-            <span key={index} className="tag" style={{
-              backgroundColor: `${space.color}15`,
-              color: space.color
-            }}>
-              {tag}
-            </span>
-          ))}
-          {space.subjects.length > 3 && (
-            <span className="tag-more">+{space.subjects.length - 3}</span>
-          )}
+        <div className="space-card-metrics">
+          <MetricItem icon={<CheckSquare size={17} />} label="今日任务" value={getTodayTaskLabel(space)} />
+          <MetricItem icon={<Flame size={17} />} label="连续学习" value={`${space.stats.consecutiveDays ?? 0} 天`} />
+          <MetricItem icon={<Clock3 size={17} />} label="累计时长" value={totalStudyHours} />
         </div>
 
-        {/* 更新信息 */}
-        <div className="space-card-update">
-          更新于 {formatUpdateTime(space.updatedAt)}
+        <div className="space-card-tags">
+          {space.subjects.slice(0, 2).map((subject) => (
+            <span key={subject.name} className="tag">
+              {subject.name}
+            </span>
+          ))}
+          <span className="tag tag-ai">{advice.title}</span>
+        </div>
+
+        <div className="space-card-footer">
+          <span>更新于 {formatUpdateTime(space.updatedAt)}</span>
+          <button
+            className="space-card-enter"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleCardClick();
+            }}
+          >
+            进入空间
+            <ArrowRight size={16} />
+          </button>
         </div>
       </div>
     </div>
   );
 };
+
+interface MetricItemProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}
+
+const MetricItem: React.FC<MetricItemProps> = ({ icon, label, value }) => (
+  <div className="space-card-metric">
+    <div className="space-card-metric-icon">{icon}</div>
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  </div>
+);

@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { Rocket } from 'lucide-react';
 import { useSpaceStore } from '@/store/spaceStore';
 import { CreateSpaceWizard, DeletedSpacesList, EditSpaceForm, SpaceActionsMenu,SpaceCard } from '@/components/workspace/space-manager'
 import { SideDrawer } from '@/components/common/SideDrawer';
@@ -11,8 +12,11 @@ import type { StudySpace, Subject, StudyGoal, TimeSchedule } from '@/types/space
 import {LogoIcon,HomeIcon,SpaceIcon,PlanIcon,
   TaskIcon,RecordIcon,ChartIcon,
   GoalIcon,SettingsIcon,PlusIcon,GridIcon,ListIcon,
-  ChevronDownIcon,BookIcon,PlayIcon,CheckIcon,ClockIcon,PauseIcon,SearchIcon,
+  ChevronDownIcon,SearchIcon,
 } from '@/components/workspace/icons';
+import { AIAdviceSection } from './AIAdviceSection';
+import { CompressedStats } from './CompressedStats';
+import { HeroSprintSection } from './HeroSprintSection';
 import './WorkSpacePanel.css';
 
 export const WorkSpacePanel: React.FC = () => {
@@ -235,24 +239,25 @@ export const WorkSpacePanel: React.FC = () => {
           <div className="header-left">
             <h1 className="page-title">我的学习空间</h1>
             <p className="page-subtitle">管理你的所有学习目标和计划</p>
+            
+          </div>
+          <div className="header-right">
             {deletedSpaces.length > 0 && (
               <button
                 className="btn-restore-spaces"
                 onClick={() => setShowDeletedDrawer(true)}
               >
-                 已删除空间 ({deletedSpaces.length})
+                已删除空间 ({deletedSpaces.length})
               </button>
             )}
-          </div>
-          <div className="header-right">
-            {/* 测试填充按钮 - 位于创建按钮的左侧 */}
+            {/* 测试模式按钮 - 位于创建按钮的左侧 */}
             <button
-              className="btn-test-space"
+              className={`btn-test-space ${spaces.length > 0 ? 'btn-test-space-compact' : ''}`}
               onClick={handleQuickCreateTestSpace}
-              style={{ marginRight: '12px' }}
               title="快速创建测试学习空间"
             >
-              ⚡ 测试填充
+              <Rocket size={17} />
+              测试模式
             </button> 
 
             <button className="btn-create-space" onClick={handleCreateSpace}>
@@ -276,58 +281,9 @@ export const WorkSpacePanel: React.FC = () => {
           </div>
         </div>
 
-        {/* 统计卡片栏 */}
-        <div className="stats-cards">
-          <div className="stat-card stat-card-all">
-            <div className="stat-icon stat-icon-blue">
-              <BookIcon />
-            </div>
-            <div className="stat-info">
-              <div className="stat-label">全部空间</div>
-              <div className="stat-number">{stats.total} 个</div>
-            </div>
-          </div>
+        <HeroSprintSection spaces={spaces} onCreateSpace={handleCreateSpace} />
 
-          <div className="stat-card stat-card-active">
-            <div className="stat-icon stat-icon-green">
-              <PlayIcon />
-            </div>
-            <div className="stat-info">
-              <div className="stat-label">进行中</div>
-              <div className="stat-number">{stats.active} 个</div>
-            </div>
-          </div>
-
-          <div className="stat-card stat-card-completed">
-            <div className="stat-icon stat-icon-purple">
-              <CheckIcon />
-            </div>
-            <div className="stat-info">
-              <div className="stat-label">已完成</div>
-              <div className="stat-number">{stats.completed} 个</div>
-            </div>
-          </div>
-
-          <div className="stat-card stat-card-upcoming">
-            <div className="stat-icon stat-icon-orange">
-              <ClockIcon />
-            </div>
-            <div className="stat-info">
-              <div className="stat-label">即将开始</div>
-              <div className="stat-number">{stats.upcoming} 个</div>
-            </div>
-          </div>
-
-          <div className="stat-card stat-card-paused">
-            <div className="stat-icon stat-icon-gray">
-              <PauseIcon />
-            </div>
-            <div className="stat-info">
-              <div className="stat-label">已暂停</div>
-              <div className="stat-number">{stats.paused} 个</div>
-            </div>
-          </div>
-        </div>
+        <CompressedStats stats={stats} />
 
         {/* 筛选与搜索栏 */}
         <div className="filter-bar">
@@ -387,50 +343,42 @@ export const WorkSpacePanel: React.FC = () => {
           </div>
         </div>
 
-        {/* 学习空间卡片网格 */}
-        <div className={`spaces-grid ${viewMode === 'list' ? 'spaces-list' : ''}`}>
-          {filteredSpaces.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">📚</div>
-              <h3>没有找到学习空间</h3>
-              <p>创建你的第一个学习目标吧！</p>
-              <button className="btn-create-first" onClick={handleCreateSpace}>
-                <PlusIcon />
-                创建学习空间
-              </button>
+        <div className="workspace-dashboard-body">
+          <div className="workspace-spaces-column">
+            {/* 学习空间卡片网格 */}
+            <div className={`spaces-grid ${viewMode === 'list' ? 'spaces-list' : ''}`}>
+              {filteredSpaces.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-icon">📚</div>
+                  <h3>没有找到学习空间</h3>
+                  <p>创建你的第一个学习目标吧！</p>
+                  <button className="btn-create-first" onClick={handleCreateSpace}>
+                    <PlusIcon />
+                    创建学习空间
+                  </button>
+                </div>
+              ) : (
+                filteredSpaces.map((space) => (
+                  <div key={space.id} className="space-card-wrapper">
+                    <SpaceCard
+                      space={space}
+                    />
+                    <SpaceActionsMenu
+                      space={space}
+                      onEdit={() => handleEditSpace(space)}
+                      onDelete={() => handleDeleteSpace(space)}
+                      onPause={() => handlePauseSpace(space)}
+                      onStats={() => handleStatsSpace(space)}
+                      onShare={() => handleShareSpace(space)}
+                      onExport={() => handleExportSpace(space)}
+                    />
+                  </div>
+                ))
+              )}
             </div>
-          ) : (
-            filteredSpaces.map((space) => (
-              <div key={space.id} className="space-card-wrapper">
-                <SpaceCard
-                  space={space}
-                />
-                <SpaceActionsMenu
-                  space={space}
-                  onEdit={() => handleEditSpace(space)}
-                  onDelete={() => handleDeleteSpace(space)}
-                  onPause={() => handlePauseSpace(space)}
-                  onStats={() => handleStatsSpace(space)}
-                  onShare={() => handleShareSpace(space)}
-                  onExport={() => handleExportSpace(space)}
-                />
-              </div>
-            ))
-          )}
-        </div>
+          </div>
 
-        {/* 底部引导区 */}
-        <div className="bottom-guide">
-          <div className="guide-content">
-            <div className="guide-icon">💡</div>
-            <div className="guide-text">
-              <h4>学习小贴士</h4>
-              <p>建议同时进行的学习空间不超过 3 个，以确保学习质量和效果。</p>
-            </div>
-          </div>
-          <div className="guide-actions">
-            <button className="btn-guide">了解更多</button>
-          </div>
+          <AIAdviceSection spaces={spaces} />
         </div>
       </main>
 
