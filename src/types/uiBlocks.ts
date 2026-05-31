@@ -54,17 +54,28 @@ export const SummaryCardPropsSchema = z.object({
 /**
  * DailyTaskList Props Schema
  */
+const DailyTaskItemSchema = z.object({
+  id: z.string(),
+  subject: z.string(),
+  task: z.string(),
+  duration: z.number(),
+  priority: z.enum(['high', 'medium', 'low']),
+  status: z.enum(['pending', 'in_progress', 'completed', 'skipped']),
+  estimatedTime: z.string().optional()
+});
+
+const DailyScheduleGroupSchema = z.object({
+  date: z.string(),
+  label: z.string(),
+  tasks: z.array(DailyTaskItemSchema)
+});
+
 export const DailyTaskListPropsSchema = z.object({
   date: z.string(),
-  tasks: z.array(z.object({
-    id: z.string(),
-    subject: z.string(),
-    task: z.string(),
-    duration: z.number(),
-    priority: z.enum(['high', 'medium', 'low']),
-    status: z.enum(['pending', 'in_progress', 'completed', 'skipped']),
-    estimatedTime: z.string().optional()
-  })),
+  tasks: z.array(DailyTaskItemSchema),
+  totalTaskCount: z.number().optional(),
+  displayedTaskCount: z.number().optional(),
+  scheduleGroups: z.array(DailyScheduleGroupSchema).optional(),
   totalDuration: z.number(),
   completionRate: z.number()
 });
@@ -368,17 +379,28 @@ export interface SummaryCardProps {
 /**
  * DailyTaskList 专用属性
  */
+export interface DailyTaskItem {
+  id: string;
+  subject: string;
+  task: string;
+  duration: number;      // 分钟
+  priority: 'high' | 'medium' | 'low';
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+  estimatedTime?: string;
+}
+
+export interface DailyScheduleGroup {
+  date: string;
+  label: string;
+  tasks: DailyTaskItem[];
+}
+
 export interface DailyTaskListProps {
   date: string;
-  tasks: Array<{
-    id: string;
-    subject: string;
-    task: string;
-    duration: number;      // 分钟
-    priority: 'high' | 'medium' | 'low';
-    status: 'pending' | 'in_progress' | 'completed' | 'skipped';
-    estimatedTime?: string;
-  }>;
+  tasks: DailyTaskItem[];
+  totalTaskCount?: number;
+  displayedTaskCount?: number;
+  scheduleGroups?: DailyScheduleGroup[];
   totalDuration: number;
   completionRate: number;
 }

@@ -3,8 +3,8 @@
  * 显示每日学习任务列表
  */
 
-import React, { useState } from 'react';
-import type { DailyTaskListProps } from '@/types/uiBlocks';
+import React, { useMemo, useState } from 'react';
+import type { DailyTaskItem, DailyTaskListProps } from '@/types/uiBlocks';
 import './DailyTaskList.css';
 
 interface DailyTaskListComponentProps extends DailyTaskListProps {
@@ -15,11 +15,28 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
   title = '每日任务',
   date,
   tasks,
-  totalDuration
+  totalDuration,
+  totalTaskCount,
+  displayedTaskCount,
+  scheduleGroups
 }) => {
-  const [taskStates, setTaskStates] = useState<Record<string, 'pending' | 'in_progress' | 'completed' | 'skipped'>>(
-    tasks.reduce((acc, task) => ({ ...acc, [task.id]: task.status }), {})
-  );
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const allTaskItems = useMemo(() => {
+    const byId = new Map<string, DailyTaskItem>();
+    for (const task of tasks) {
+      byId.set(task.id, task);
+    }
+    for (const group of scheduleGroups || []) {
+      for (const task of group.tasks) {
+        if (!byId.has(task.id)) {
+          byId.set(task.id, task);
+        }
+      }
+    }
+    return Array.from(byId.values());
+  }, [tasks, scheduleGroups]);
+
+  const [taskStates, setTaskStates] = useState<Record<string, 'pending' | 'in_progress' | 'completed' | 'skipped'>>({});
 
   // 获取优先级样式
   const getPriorityClass = (priority: string): string => {
@@ -56,7 +73,7 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
   // 切换任务状态
   const toggleTaskStatus = (taskId: string) => {
     setTaskStates(prev => {
-      const currentStatus = prev[taskId];
+      const currentStatus = prev[taskId] || allTaskItems.find(task => task.id === taskId)?.status || 'pending';
       const statusFlow: Record<string, string> = {
         pending: 'in_progress',
         in_progress: 'completed',
@@ -71,7 +88,8 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
   };
 
   // 计算完成进度
-  const completedCount = Object.values(taskStates).filter(s => s === 'completed').length;
+  const getTaskStatus = (task: DailyTaskItem) => taskStates[task.id] || task.status;
+  const completedCount = tasks.filter(task => getTaskStatus(task) === 'completed').length;
   const totalCount = tasks.length;
   const currentCompletionRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
@@ -83,6 +101,39 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return mins > 0 ? `${hours}小时${mins}分钟` : `${hours}小时`;
+  };
+
+  const visibleTaskCount = displayedTaskCount ?? tasks.length;
+  const plannedTaskCount = totalTaskCount ?? allTaskItems.length;
+  const hasFullSchedule = !!scheduleGroups?.length && plannedTaskCount > visibleTaskCount;
+
+  const renderTaskItem = (task: DailyTaskItem, className = '') => {
+    const taskStatus = getTaskStatus(task);
+    return (
+      <div
+        key={task.id}
+        className={`task-item ${getPriorityClass(task.priority)} ${getStatusClass(taskStatus)} ${className}`.trim()}
+        onClick={() => toggleTaskStatus(task.id)}
+      >
+        <div className="task-checkbox">
+          <span className="task-status-icon">{getStatusIcon(taskStatus)}</span>
+        </div>
+
+        <div className="task-content">
+          <div className="task-header">
+            <span className="task-subject">{task.subject}</span>
+            <span className="task-priority-badge">{task.priority === 'high' ? '重要' : task.priority === 'medium' ? '中等' : '普通'}</span>
+          </div>
+          <div className="task-title">{task.task}</div>
+          <div className="task-meta">
+            {task.estimatedTime && (
+              <span className="task-time">🕐 {task.estimatedTime}</span>
+            )}
+            <span className="task-duration">⏱️ {formatDuration(task.duration)}</span>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -114,34 +165,7 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
 
       {/* 任务列表 */}
       <div className="daily-task-items">
-        {tasks.map((task) => {
-          const taskStatus = taskStates[task.id] || task.status;
-          return (
-            <div
-              key={task.id}
-              className={`task-item ${getPriorityClass(task.priority)} ${getStatusClass(taskStatus)}`}
-              onClick={() => toggleTaskStatus(task.id)}
-            >
-              <div className="task-checkbox">
-                <span className="task-status-icon">{getStatusIcon(taskStatus)}</span>
-              </div>
-
-              <div className="task-content">
-                <div className="task-header">
-                  <span className="task-subject">{task.subject}</span>
-                  <span className="task-priority-badge">{task.priority === 'high' ? '重要' : task.priority === 'medium' ? '中等' : '普通'}</span>
-                </div>
-                <div className="task-title">{task.task}</div>
-                <div className="task-meta">
-                  {task.estimatedTime && (
-                    <span className="task-time">🕐 {task.estimatedTime}</span>
-                  )}
-                  <span className="task-duration">⏱️ {formatDuration(task.duration)}</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {tasks.map(task => renderTaskItem(task))}
 
         {tasks.length === 0 && (
           <div className="task-empty">
@@ -150,6 +174,36 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
           </div>
         )}
       </div>
+
+      <div className="daily-task-schedule-summary">
+        <span>已展示 {visibleTaskCount} / 共 {plannedTaskCount} 个排期任务</span>
+        {hasFullSchedule && (
+          <button
+            type="button"
+            className="daily-task-schedule-toggle"
+            aria-expanded={isScheduleOpen}
+            onClick={() => setIsScheduleOpen(open => !open)}
+          >
+            {isScheduleOpen ? '收起完整排期' : '查看完整排期'}
+          </button>
+        )}
+      </div>
+
+      {hasFullSchedule && isScheduleOpen && (
+        <div className="daily-task-schedule-groups">
+          {scheduleGroups.map(group => (
+            <section className="schedule-group" key={group.date}>
+              <div className="schedule-group-header">
+                <span className="schedule-group-label">{group.label}</span>
+                <span className="schedule-group-count">{group.tasks.length} 个任务</span>
+              </div>
+              <div className="schedule-group-tasks">
+                {group.tasks.map(task => renderTaskItem(task, 'schedule-task-item'))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

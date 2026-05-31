@@ -11,6 +11,31 @@ const messageHasCollectionForm = (message: Message) =>
 const messageHasWorkflowProcess = (message: Message) =>
   !!message.workflow_process_steps?.length;
 
+const shouldPersistWorkflowEvent = (
+  event: NonNullable<Message['workflow_events']>[number]
+) => event.type !== 'thinking' && event.type !== 'thinking_end';
+
+const sanitizeMessageForStorage = (message: Message): Message => {
+  const workflowEvents = message.workflow_events?.filter(shouldPersistWorkflowEvent);
+  const nextMessage: Message = {
+    ...message,
+    thinkingActive: false
+  };
+
+  if (workflowEvents && workflowEvents.length > 0) {
+    nextMessage.workflow_events = workflowEvents;
+  } else {
+    delete nextMessage.workflow_events;
+  }
+
+  return nextMessage;
+};
+
+const sanitizeSessionForStorage = (session: ChatSession): ChatSession => ({
+  ...session,
+  messages: session.messages.map(sanitizeMessageForStorage)
+});
+
 const updateSessionMessage = (
   sessions: ChatSession[],
   currentSessionId: string | null,
@@ -38,10 +63,7 @@ const createLegacySession = (
     id: currentSessionId || generateId(),
     spaceId: currentSpaceId,
     title: messages.find(message => message.role === 'user')?.content.slice(0, 30) || '历史对话',
-    messages: messages.map(message => ({
-      ...message,
-      thinkingActive: message.thinkingActive ?? false
-    })),
+    messages: messages.map(sanitizeMessageForStorage),
     createdAt: now,
     updatedAt: now,
     draftMessage: '',
@@ -50,7 +72,7 @@ const createLegacySession = (
 };
 
 const normalizeMessageRuntimeFields = (message: Message) => {
-  message.thinkingActive ??= false;
+  message.thinkingActive = false;
 };
 
 export const useChatStore = create<ChatStore>()(
@@ -311,6 +333,9 @@ export const useChatStore = create<ChatStore>()(
           targetMessage.form_submission_state = 'submitted';
           targetMessage.submitted_form_summary = summary;
           targetMessage.ui_blocks = targetMessage.ui_blocks?.filter(block => block.type !== 'collection-form') || [];
+          if (/^\s*\[需要信息\]/.test(targetMessage.content)) {
+            targetMessage.content = '';
+          }
         };
 
         updater(message);
@@ -424,6 +449,33 @@ export const useChatStore = create<ChatStore>()(
               state.currentSessionId = null;
               state.messages = [];
             }
+          }
+        });
+      },
+
+      deleteSessionsBySpace: (spaceId: string) => {
+        set((state) => {
+          const currentSessionBeforeDelete = state.currentSessionId
+            ? state.sessions.find(session => session.id === state.currentSessionId)
+            : null;
+          const shouldResetCurrentSession = currentSessionBeforeDelete?.spaceId === spaceId;
+
+          state.sessions = state.sessions.filter(session => session.spaceId !== spaceId);
+
+          if (shouldResetCurrentSession) {
+            state.currentSessionId = null;
+            state.messages = [];
+            state.uiBlocks = [];
+            state.currentWorkflowEvents = [];
+            state.formStepsData = {};
+            state.workflowInterrupted = false;
+            state.lastFormStep = null;
+            state.activeFormStep = 0;
+            state.workspaceState = 'empty';
+          }
+
+          if (state.currentSpaceId === spaceId) {
+            state.currentSpaceId = null;
           }
         });
       },
@@ -655,7 +707,7 @@ export const useChatStore = create<ChatStore>()(
     })),
     {
       name: 'chat-storage',
-      version: 2,
+      version: 3,
       migrate: (persistedState: unknown) => {
         if (!persistedState || typeof persistedState !== 'object') {
           return persistedState as Record<string, unknown>;
@@ -677,7 +729,7 @@ export const useChatStore = create<ChatStore>()(
           );
           return {
             ...state,
-            sessions: [legacySession],
+            sessions: [sanitizeSessionForStorage(legacySession)],
             currentSessionId: legacySession.id,
             messages: []
           };
@@ -685,7 +737,8 @@ export const useChatStore = create<ChatStore>()(
 
         return {
           ...state,
-          messages: []
+          sessions: sessions.map(session => sanitizeSessionForStorage(session as ChatSession)),
+          messages: legacyMessages.map(message => sanitizeMessageForStorage(message as Message))
         };
       },
       onRehydrateStorage: () => (state) => {
@@ -717,7 +770,7 @@ export const useChatStore = create<ChatStore>()(
         currentAgentId: state.currentAgentId,
         currentSessionId: state.currentSessionId,
         currentSpaceId: state.currentSpaceId,
-        sessions: state.sessions,
+        sessions: state.sessions.map(sanitizeSessionForStorage),
         activeFormStep: state.activeFormStep,
         formStepsData: state.formStepsData,
         workflowInterrupted: state.workflowInterrupted,

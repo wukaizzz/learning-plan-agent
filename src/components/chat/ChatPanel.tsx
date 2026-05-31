@@ -8,6 +8,7 @@ import { WorkflowResumePrompt } from '@/components/workflow-resume/WorkflowResum
 import { useChat, useStream, useAgent, useWorkflow } from '@/hooks';
 import { useChatStore, useSpaceStore } from '@/store';
 import { traceAgent } from '@/shared/debug/agentTrace';
+import { mapSpaceToContext } from '@/utils/spaceContextMapper';
 import type { Message } from '@/types';
 import { logger } from '@/logger';
 import './ChatPanel.css';
@@ -83,8 +84,11 @@ export const ChatPanel: React.FC = () => {
   const navigate = useNavigate();
   const { spaceId } = useParams();
   const { getCurrentSpace } = useSpaceStore();
+  const spaces = useSpaceStore(state => state.spaces);
 
-  const currentSpace = getCurrentSpace();
+  const currentSpace = spaceId
+    ? spaces.find(space => space.id === spaceId) || null
+    : getCurrentSpace();
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [localFormStep, setLocalFormStep] = useState<number | null>(null);
 
@@ -258,15 +262,22 @@ export const ChatPanel: React.FC = () => {
 
     addUserMessage(content);
     const messagesForApi: Message[] = useChatStore.getState().messages;
+    const spaceForRequest = spaceId
+      ? useSpaceStore.getState().spaces.find(space => space.id === spaceId)
+      : null;
+    const studySpaceContext = spaceForRequest
+      ? mapSpaceToContext(spaceForRequest)
+      : undefined;
     logger.info(
       { 
-        messages: messagesForApi, 
+        messageCount: messagesForApi.length,
+        hasStudySpaceContext: !!studySpaceContext,
         position: "chanPanel" 
       }, 
       'chanPanel sendMessage'
     );
     try {
-      await streamResponse(messagesForApi, 'deepseek');
+      await streamResponse(messagesForApi, 'deepseek', { studySpaceContext });
     } catch (error) {
       console.error('Failed to send message:', error);
       alert(`Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`);

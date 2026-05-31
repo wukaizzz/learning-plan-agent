@@ -22,12 +22,17 @@ const ACTION_BLOCK_TYPES = new Set(['action-bar']);
 
 const ACTIVE_GENERATION_STATES: WorkspaceState[] = ['analyzing', 'generating', 'reviewing'];
 
+function hasActionItems(block: UIBlock): boolean {
+  const actions = (block.props as { actions?: unknown }).actions;
+  return Array.isArray(actions) && actions.length > 0;
+}
+
 export const PlanWorkspace: React.FC<PlanWorkspaceProps> = ({
   workspaceState,
   uiBlocks
 }) => {
   const planBlocks = uiBlocks.filter(block => PLAN_BLOCK_TYPES.has(block.type));
-  const actionBlocks = planBlocks.filter(block => ACTION_BLOCK_TYPES.has(block.type));
+  const actionBlocks = planBlocks.filter(block => ACTION_BLOCK_TYPES.has(block.type) && hasActionItems(block));
   const contentBlocks = planBlocks.filter(block => !ACTION_BLOCK_TYPES.has(block.type));
   const shouldShowGenerating = planBlocks.length === 0 && ACTIVE_GENERATION_STATES.includes(workspaceState);
 

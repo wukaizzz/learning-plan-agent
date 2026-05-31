@@ -110,6 +110,7 @@ export interface ChatStore {
   createNewSession: (title?: string, spaceId?: string | null) => string;
   switchSession: (sessionId: string) => void;
   deleteSession: (sessionId: string) => void;
+  deleteSessionsBySpace: (spaceId: string) => void;
   updateSessionTitle: (sessionId: string, title: string) => void;
   getAllSessions: () => ChatSession[];
   getSessionsBySpace: (spaceId: string) => ChatSession[]; // 获取特定空间的会话

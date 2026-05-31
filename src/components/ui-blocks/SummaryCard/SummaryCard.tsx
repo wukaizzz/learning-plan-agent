@@ -132,7 +132,7 @@ export const SummaryCard: React.FC<SummaryCardComponentProps> = ({
                     />
                   </div>
                   <div className="subject-target">
-                    目标: {subject.targetLevel}分
+                    目标水平: {subject.targetLevel}/10
                   </div>
                 </div>
               ))}

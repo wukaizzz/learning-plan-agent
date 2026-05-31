@@ -67,7 +67,7 @@ export function traceAgent(entry: Omit<AgentTraceEntry, 'id' | 'time'>) {
 
   console.groupCollapsed(
     `%c[AGENT TRACE]%c ${trace.layer} | ${trace.label}`,
-    'color:#7c3aed;font-weight:bold;',
+    'color:#64748b;font-weight:bold;',
     'color:inherit;',
     {
       executionId: trace.executionId,

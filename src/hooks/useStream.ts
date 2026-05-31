@@ -5,6 +5,7 @@ import { useChatStore } from '../store/chatStore';
 import { API_ENDPOINT } from '../utils/constants';
 import { traceAgent } from '@/shared/debug/agentTrace';
 import type { Message, ToolCall, AgentExecutionState } from '../types/chat';
+import type { StudySpaceContext } from '@/utils/spaceContextMapper';
 import type { WorkflowStepEvent, InfoNeededEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, UIBlockUpdateEvent, ThinkingEvent, ThinkingEndEvent, IntentRoutedEvent, WorkflowEvent } from '../types/workflowEvents';
 
 const createClientId = (prefix: string) => {
@@ -13,6 +14,17 @@ const createClientId = (prefix: string) => {
   }
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
+
+type ApiMessage = Pick<Message, 'role' | 'content'>;
+
+type StreamResponseOptions = {
+  studySpaceContext?: StudySpaceContext;
+};
+
+const sanitizeMessagesForApi = (messages: Message[]): ApiMessage[] =>
+  (Array.isArray(messages) ? messages : [])
+    .slice(-12)
+    .map(({ role, content }) => ({ role, content }));
 
 type SSEChunkHandler = (chunk: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -123,19 +135,7 @@ export function useStream() {
 
   const handleInfoNeeded = useCallback((event: InfoNeededEvent) => {
     console.log('❓ Info needed:', event);
-    // 这里可以：
-    // 1. 显示输入框给用户
-    // 2. 在聊天中显示AI的问题
-    // 3. 将问题添加到消息列表
-    const questionMsg = `[需要信息] ${event.question}`;
-    if (!hasStartedStreaming.current) {
-      addAssistantMessage(questionMsg);
-      hasStartedStreaming.current = true;
-    } else {
-      currentMessageRef.current += `\n\n${questionMsg}`;
-      updateLastAssistantMessage(currentMessageRef.current);
-    }
-  }, [addAssistantMessage, updateLastAssistantMessage]);
+  }, []);
 
   const handleToolCall = useCallback((event: ToolCallEvent) => {
     console.log('🔧 Tool call:', event);
@@ -245,29 +245,7 @@ export function useStream() {
 
   const handleAnalysisResult = useCallback((event: AnalysisResultEvent) => {
     console.log('📊 Analysis result:', event);
-    // 将分析结果格式化为可读文本
-    let resultText = `\n\n📊 ${event.summary}\n`;
-    if (event.findings && event.findings.length > 0) {
-      resultText += '\n发现：\n';
-      event.findings.forEach(finding => {
-        resultText += `• ${finding}\n`;
-      });
-    }
-    if (event.recommendations && event.recommendations.length > 0) {
-      resultText += '\n建议：\n';
-      event.recommendations.forEach(rec => {
-        resultText += `• ${rec}\n`;
-      });
-    }
-
-    currentMessageRef.current += resultText;
-    if (!hasStartedStreaming.current) {
-      addAssistantMessage(currentMessageRef.current);
-      hasStartedStreaming.current = true;
-    } else {
-      updateLastAssistantMessage(currentMessageRef.current);
-    }
-  }, [addAssistantMessage, updateLastAssistantMessage]);
+  }, []);
 
   // 🆕 处理UI Block更新事件
   const handleUIBlockUpdate = useCallback((event: UIBlockUpdateEvent) => {
@@ -444,7 +422,8 @@ export function useStream() {
   // TODO 对话处理核心函数
   const streamResponse = useCallback(async (
     messages: Message[],
-    apiProvider: 'deepseek' | 'doubao' = 'deepseek'
+    apiProvider: 'deepseek' | 'doubao' = 'deepseek',
+    options: StreamResponseOptions = {}
   ): Promise<void> => {
     const agentConfig = getCurrentAgentConfig();
     if (!agentConfig) {
@@ -480,9 +459,10 @@ export function useStream() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messages,
+          messages: sanitizeMessagesForApi(messages),
           agentConfig,
           studySpaceId: currentSpaceId,
+          studySpaceContext: options.studySpaceContext,
           runId,
           messageId: assistantMessageId
         }),
@@ -551,7 +531,7 @@ export function useStream() {
                 case 'info_needed':
                   // 处理信息收集事件
                   ensureAssistantMessage();
-                  handleInfoNeeded(chunk);
+                  handleInfoNeeded(chunk);  // TODO info_need
                   appendCurrentWorkflowEvent(chunk); // 🆕 添加事件
                   break;
 
@@ -595,7 +575,6 @@ export function useStream() {
 
                 case 'thinking':
                   ensureAssistantMessage();
-                  appendCurrentWorkflowEvent(chunk);
                   if (currentMessageIdRef.current) {
                     handleThinking(chunk, currentMessageIdRef.current);
                   }
@@ -603,7 +582,6 @@ export function useStream() {
 
                 case 'thinking_end':
                   ensureAssistantMessage();
-                  appendCurrentWorkflowEvent(chunk);
                   if (currentMessageIdRef.current) {
                     handleThinkingEnd(chunk, currentMessageIdRef.current);
                   }
@@ -678,7 +656,7 @@ export function useStream() {
         abortControllerRef.current = null;
       }
     }
-  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, currentSpaceId, ensureAssistantMessage, handleIntentRouted, appendCurrentWorkflowEvent, setCurrentWorkflowEvents, handleWorkflowStep, handleInfoNeeded, handleToolCall, handleProcessing, handleAnalysisResult, handleUIBlockUpdate, handleThinking, handleThinkingEnd, flushThinking, resetThinkingBuffer]);
+  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, currentSpaceId, ensureAssistantMessage, handleIntentRouted, appendCurrentWorkflowEvent, setCurrentWorkflowEvents, handleWorkflowStep, handleInfoNeeded, handleToolCall, handleProcessing, handleAnalysisResult, handleUIBlockUpdate, handleThinking, handleThinkingEnd, handleAgentExecutionStart, handleAgentStepUpdate, handleAgentExecutionFinish, flushThinking, resetThinkingBuffer]);
 
   const streamResume = useCallback(async (params: {
     threadId: string;
@@ -729,7 +707,7 @@ export function useStream() {
             if (chunk.step === 'paused') interrupted = true;
             break;
           case 'info_needed':
-            handleInfoNeeded(chunk);
+            handleInfoNeeded(chunk); // TODO info_need
             interrupted = true;
             break;
           case 'ui_block_update':
@@ -743,11 +721,9 @@ export function useStream() {
             break;
           }
           case 'thinking':
-            appendCurrentWorkflowEvent(chunk);
             handleThinking(chunk, messageId);
             break;
           case 'thinking_end':
-            appendCurrentWorkflowEvent(chunk);
             handleThinkingEnd(chunk, messageId);
             break;
           case 'error':
@@ -774,7 +750,7 @@ export function useStream() {
       resetThinkingBuffer();
       setStreaming(false);
     }
-  }, [setStreaming, handleAgentStepUpdate, handleAgentExecutionFinish, handleWorkflowStep, handleInfoNeeded, handleUIBlockUpdate, handleThinking, handleThinkingEnd, appendCurrentWorkflowEvent, flushThinking, resetThinkingBuffer]);
+  }, [setStreaming, handleAgentStepUpdate, handleAgentExecutionFinish, handleWorkflowStep, handleInfoNeeded, handleUIBlockUpdate, handleThinking, handleThinkingEnd, flushThinking, resetThinkingBuffer]);
 
   const executeTool = useCallback(async (
     toolCallId: string,

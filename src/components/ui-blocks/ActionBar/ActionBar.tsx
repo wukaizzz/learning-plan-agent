@@ -15,6 +15,10 @@ export const ActionBar: React.FC<ActionBarComponentProps> = ({
   title,
   actions
 }) => {
+  if (!actions || actions.length === 0) {
+    return null;
+  }
+
   // 获取按钮样式类
   const getButtonClass = (type: string): string => {
     const typeMap: Record<string, string> = {

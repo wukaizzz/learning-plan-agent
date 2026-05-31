@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
+import { useChatStore } from './chatStore';
 import type { StudySpace, SpaceStore } from '../types/space';
 
 // 生成唯一ID
@@ -234,6 +235,7 @@ export const useSpaceStore = create<SpaceStore>()(
             state.currentSpaceId = activeSpaces.length > 0 ? activeSpaces[0].id : null;
           }
         });
+        useChatStore.getState().deleteSessionsBySpace(spaceId);
       },
 
       // 获取已删除的空间列表

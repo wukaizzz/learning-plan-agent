@@ -113,14 +113,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onCollectionF
           <AgentExecutionCard execution={message.agent_execution} />
         )}
 
-        {!isUser && message.thinkingContent && (
-          <ThinkingBlock
-            _thinkingContent={message.thinkingContent}
-            _thinkingActive={message.thinkingActive === true}
-            _thinkingDuration={message.thinkingDuration}
-          />
-        )}
-
         {!isUser && hasSubmittedSummary && (
           <div className="message-submitted-form-summary">
             <div className="message-submitted-form-title">已提交信息</div>
@@ -135,15 +127,25 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onCollectionF
           </div>
         )}
 
-        <div className="message-content">
-          <ReactMarkdown
-            components={{
-              code: CodeBlock,
-            }}
-          >
-            {message.content}
-          </ReactMarkdown>
-        </div>
+        {!isUser && message.thinkingContent && (
+          <ThinkingBlock
+            _thinkingContent={message.thinkingContent}
+            _thinkingActive={message.thinkingActive === true}
+            _thinkingDuration={message.thinkingDuration}
+          />
+        )}
+
+        {message.content && (
+          <div className="message-content">
+            <ReactMarkdown
+              components={{
+                code: CodeBlock,
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          </div>
+        )}
 
         {!isUser && processSteps.length > 0 && !message.agent_execution && (
           <div className="message-workflow-process">

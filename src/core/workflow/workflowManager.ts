@@ -8,6 +8,15 @@
 import type { WorkspaceState, UIBlock } from '../../types/uiBlocks';
 import { createBlock } from '../../types/uiBlocks';
 
+const LEGACY_MOCK_PLAN_STATES = new Set<WorkspaceState>(['reviewing', 'finalized', 'paused']);
+const LEGACY_MOCK_PLAN_BLOCK_TYPES = new Set([
+  'summary-card',
+  'daily-task-list',
+  'progress-bar',
+  'risk-alert',
+  'action-bar'
+]);
+
 /**
  * 工作流阶段到 UI Blocks 的映射配置
  *
@@ -637,7 +646,12 @@ export const getBlocksForState = (currentState: WorkspaceState): UIBlock[] => {
     return WORKFLOW_BLOCK_MAPPING.empty();
   }
 
-  return blocksGetter();
+  const blocks = blocksGetter();
+  if (LEGACY_MOCK_PLAN_STATES.has(currentState)) {
+    return blocks.filter(block => !LEGACY_MOCK_PLAN_BLOCK_TYPES.has(block.type));
+  }
+
+  return blocks;
 };
 
 /**
