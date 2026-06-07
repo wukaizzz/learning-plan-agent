@@ -422,7 +422,7 @@ export function useStream() {
   // TODO 对话处理核心函数
   const streamResponse = useCallback(async (
     messages: Message[],
-    apiProvider: 'deepseek' | 'doubao' = 'deepseek',
+    apiProvider: 'deepseek' | 'doubao' | 'mimo' = 'deepseek',
     options: StreamResponseOptions = {}
   ): Promise<void> => {
     const agentConfig = getCurrentAgentConfig();
@@ -452,7 +452,13 @@ export function useStream() {
     setStreaming(true);
     
     try {
-      const endpoint = apiProvider === 'doubao' ? '/doubao' : '/chat';
+      //添加api端点映射
+      const ENDPOINT_MAP: Record<string, string> = {
+        deepseek: '/chat',
+        doubao: '/doubao',
+        mimo: '/mimo',
+      };
+      const endpoint = ENDPOINT_MAP[apiProvider] || '/chat';
       const response = await fetch(`${API_ENDPOINT}${endpoint}`, {
         method: 'POST',
         headers: {

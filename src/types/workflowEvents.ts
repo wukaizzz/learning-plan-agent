@@ -71,7 +71,7 @@ export interface ProcessingEvent extends WorkflowEventMeta {
 export interface IntentRoutedEvent extends WorkflowEventMeta {
   type: 'intent_routed';
   payload: {
-    intent: 'general_chat' | 'initial_planning' | 'tool_assisted_answer' | 'query_plan' | 'adjust_plan' | 'replan' | 'clarification' | 'unknown';
+    intent: 'general_chat' | 'initial_planning' | 'tool_assisted_answer' | 'query_plan' | 'adjust_plan' | 'replan' | 'explain_plan' | 'progress_next_step' | 'clarification' | 'unknown';
     confidence: number;
     source: 'llm' | 'rule_fallback';
     certainty: 'high' | 'medium' | 'low';
@@ -92,6 +92,7 @@ export interface AgentExecutionStartEvent extends WorkflowEventMeta {
   type: 'agent_execution_start';
   executionId: string;
   title: string;
+  executionType?: 'fixed_workflow' | 'autonomous_agent';
   steps: Array<{ stepId: string; title: string }>;
   metadata?: Record<string, unknown>;
 }
