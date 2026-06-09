@@ -1,9 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-import { MessageList, MessageInput, SessionList } from '@/components/chat/message';
+import { MessageList, MessageInput } from '@/components/chat/message';
 import { WorkflowSection } from './WorkflowSection';
-import { PlanWorkspace } from './PlanWorkspace';
 import { WorkflowResumePrompt } from '@/components/workflow-resume/WorkflowResumePrompt';
 import { useChat, useStream, useAgent, useWorkflow } from '@/hooks';
 import { useChatStore, useSpaceStore } from '@/store';
@@ -64,7 +63,6 @@ export const ChatPanel: React.FC = () => {
     switchToSpaceSession,
     resetFormCollection,
     createNewSession,
-    setCurrentSpace,
     uiBlocks,
     submitFormStep,
     setWorkspaceState,
@@ -81,7 +79,6 @@ export const ChatPanel: React.FC = () => {
   const setActiveFormStep = useChatStore(state => state.setActiveFormStep);
   const currentSessionId = useChatStore(state => state.currentSessionId);
   const { transitionToState, isWorkflowActive } = useWorkflow();
-  const navigate = useNavigate();
   const { spaceId } = useParams();
   const { getCurrentSpace } = useSpaceStore();
   const spaces = useSpaceStore(state => state.spaces);
@@ -105,11 +102,6 @@ export const ChatPanel: React.FC = () => {
       lastFormStep
     };
   }, [workspaceState, workflowInterrupted, lastFormStep]);
-
-  const handleExitSpace = () => {
-    setCurrentSpace(null);
-    navigate('/workSpace');
-  };
 
   const handleResumeWorkflow = () => {
     setShowResumePrompt(false);
@@ -288,77 +280,56 @@ export const ChatPanel: React.FC = () => {
 
   return (
     <div className="chat-panel-container">
-      <SessionList />
+      <div className="chat-panel">
+        {showResumePrompt && (
+          <WorkflowResumePrompt
+            stepIndex={activeFormStep}
+            totalSteps={3}
+            onResume={handleResumeWorkflow}
+            onRestart={handleRestartWorkflow}
+            onDismiss={handleDismissResumePrompt}
+          />
+        )}
 
-      <div className="chat-workspace-layout">
-        <div className="chat-panel">
-          {showResumePrompt && (
-            <WorkflowResumePrompt
-              stepIndex={activeFormStep}
-              totalSteps={3}
-              onResume={handleResumeWorkflow}
-              onRestart={handleRestartWorkflow}
-              onDismiss={handleDismissResumePrompt}
+        <div className="chat-panel-header">
+          <div className="chat-panel-header-content">
+            <div className="chat-panel-title-section">
+              <div className="chat-panel-title-info">
+                <h1 className="chat-panel-title">
+                  {currentSpace?.name || currentAgent?.name || 'AI 学习空间'}
+                </h1>
+                <p className="chat-panel-subtitle">
+                  {currentSpace ? currentSpace.description : (currentAgent?.description || 'Chat with AI agent powered by DeepSeek')}
+                </p>
+              </div>
+            </div>
+            {isStreaming && (
+              <div className="chat-panel-streaming">
+                <LoadingSpinner size="sm" />
+                <span className="chat-panel-streaming-text">Thinking...</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="chat-panel-messages">
+          {isWorkflowActive && (
+            <WorkflowSection
+              workspaceState={workspaceState}
+              uiBlocks={uiBlocks}
+              onStateChange={transitionToState}
             />
           )}
-
-          <div className="chat-panel-header">
-            <div className="chat-panel-header-content">
-              <div className="chat-panel-title-section">
-                <div className="chat-panel-title-with-exit">
-                  <div className="chat-panel-title-info">
-                    <h1 className="chat-panel-title">
-                      {currentSpace?.name || currentAgent?.name || 'AI 学习空间'}
-                    </h1>
-                    <p className="chat-panel-subtitle">
-                      {currentSpace ? currentSpace.description : (currentAgent?.description || 'Chat with AI agent powered by DeepSeek')}
-                    </p>
-                  </div>
-                  <button
-                    className="chat-panel-exit-btn"
-                    onClick={handleExitSpace}
-                    title="退出空间"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M10 13L5 8M5 8L10 3M5 8H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    退出空间
-                  </button>
-                </div>
-              </div>
-              {isStreaming && (
-                <div className="chat-panel-streaming">
-                  <LoadingSpinner size="sm" />
-                  <span className="chat-panel-streaming-text">Thinking...</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="chat-panel-messages">
-            {isWorkflowActive && (
-              <WorkflowSection
-                workspaceState={workspaceState}
-                uiBlocks={uiBlocks}
-                onStateChange={transitionToState}
-              />
-            )}
-            <MessageList
-              messages={messages}
-              isStreaming={isStreaming}
-              onCollectionFormSubmit={handleCollectionFormSubmit}
-            />
-          </div>
-
-          <MessageInput
-            onSendMessage={handleSendMessage}
-            disabled={isStreaming}
+          <MessageList
+            messages={messages}
+            isStreaming={isStreaming}
+            onCollectionFormSubmit={handleCollectionFormSubmit}
           />
         </div>
 
-        <PlanWorkspace
-          workspaceState={workspaceState}
-          uiBlocks={uiBlocks}
+        <MessageInput
+          onSendMessage={handleSendMessage}
+          disabled={isStreaming}
         />
       </div>
     </div>

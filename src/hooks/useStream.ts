@@ -2,7 +2,10 @@ import { useCallback, useRef } from 'react';
 import { useChat } from './useChat';
 import { useAgent } from './useAgent';
 import { useChatStore } from '../store/chatStore';
+import { useSpaceStore } from '../store/spaceStore';
+import { usePlanStore } from '../store/planStore';
 import { API_ENDPOINT } from '../utils/constants';
+import { PLAN_BLOCK_TYPES } from '@/utils/planBlockAdapter';
 import { traceAgent } from '@/shared/debug/agentTrace';
 import type { Message, ToolCall, AgentExecutionState } from '../types/chat';
 import type { StudySpaceContext } from '@/utils/spaceContextMapper';
@@ -94,7 +97,6 @@ export function useStream() {
     clearUIBlocks,
     setWorkspaceState,
     addUIBlockToLastAssistantMessage,
-    currentSpaceId,
     setCurrentWorkflowEvents,
     addWorkflowEvent,
     updateMessageWorkflowEvents,
@@ -111,6 +113,7 @@ export function useStream() {
   const thinkingFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingThinkingMessageIdRef = useRef<string | null>(null);
   const thinkingEndedRef = useRef<boolean>(false);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 工作流事件处理函数
   const handleWorkflowStep = useCallback((event: WorkflowStepEvent) => {
@@ -125,6 +128,27 @@ export function useStream() {
 
     if (event.step === 'collecting') {
       clearUIBlocks();
+    }
+
+    if (event.step === 'finalized') {
+      const activeSpaceId = useChatStore.getState().currentSpaceId;
+      if (activeSpaceId) {
+        useSpaceStore.getState().updateSpace(activeSpaceId, { status: 'active' });
+
+        // 先 flush 防抖队列中的 draft save，确保 plan 已写入
+        if (draftSaveTimerRef.current) {
+          clearTimeout(draftSaveTimerRef.current);
+          draftSaveTimerRef.current = null;
+          const currentBlocks = useChatStore.getState().uiBlocks;
+          usePlanStore.getState().saveDraftBlocks(activeSpaceId, currentBlocks, {
+            sessionId: useChatStore.getState().currentSessionId ?? undefined,
+            messageId: currentMessageIdRef.current ?? undefined,
+          });
+        }
+
+        // 阶段 2：将 draft plan 标记为 active
+        usePlanStore.getState().activatePlan(activeSpaceId);
+      }
     }
 
     // 可以在这里添加进度条更新逻辑
@@ -247,6 +271,21 @@ export function useStream() {
     console.log('📊 Analysis result:', event);
   }, []);
 
+  // 防抖写入 planStore：SSE 流中可能有大量 ui_block_update，避免每次都写 localStorage
+  const scheduleDraftSave = useCallback(() => {
+    const spaceId = useChatStore.getState().currentSpaceId;
+    if (!spaceId) return;
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(() => {
+      draftSaveTimerRef.current = null;
+      const currentBlocks = useChatStore.getState().uiBlocks;
+      usePlanStore.getState().saveDraftBlocks(spaceId, currentBlocks, {
+        sessionId: useChatStore.getState().currentSessionId ?? undefined,
+        messageId: currentMessageIdRef.current ?? undefined,
+      });
+    }, 300);
+  }, []);
+
   // 🆕 处理UI Block更新事件
   const handleUIBlockUpdate = useCallback((event: UIBlockUpdateEvent) => {
     console.log('🎨 UI Block update:', event);
@@ -275,6 +314,11 @@ export function useStream() {
       }
 
       addUIBlock(event.block);
+
+      // 阶段 1：计划相关 block 防抖写入 planStore 作为 draft
+      if (PLAN_BLOCK_TYPES.has(event.block.type)) {
+        scheduleDraftSave();
+      }
     } else if (event.action === 'update' && event.block) {
       if (event.block.type === 'collection-form') {
         addUIBlockToLastAssistantMessage(event.block);
@@ -284,6 +328,11 @@ export function useStream() {
       // 更新现有block（需要先删除再添加，或者直接修改）
       // 简化实现：直接添加新block
       addUIBlock(event.block);
+
+      // 阶段 1：计划相关 block 更新也防抖写入 planStore
+      if (PLAN_BLOCK_TYPES.has(event.block.type)) {
+        scheduleDraftSave();
+      }
     } else if (event.action === 'remove' && event.blockId) {
       // 移除指定block（需要在chatStore中实现removeUIBlock方法）
       console.log('Remove block:', event.blockId);
@@ -442,11 +491,12 @@ export function useStream() {
     resetThinkingBuffer();
     hasStartedStreaming.current = false;
     setCurrentWorkflowEvents([]);
+    const requestSpaceId = useChatStore.getState().currentSpaceId;
     traceAgent({
       layer: 'frontend:useStream',
       label: 'streamResponse started',
       messageId: assistantMessageId,
-      threadId: currentSpaceId ?? undefined,
+      threadId: requestSpaceId ?? undefined,
       data: { runId, apiProvider }
     });
     setStreaming(true);
@@ -467,7 +517,7 @@ export function useStream() {
         body: JSON.stringify({
           messages: sanitizeMessagesForApi(messages),
           agentConfig,
-          studySpaceId: currentSpaceId,
+          studySpaceId: requestSpaceId,
           studySpaceContext: options.studySpaceContext,
           runId,
           messageId: assistantMessageId
@@ -662,7 +712,7 @@ export function useStream() {
         abortControllerRef.current = null;
       }
     }
-  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, currentSpaceId, ensureAssistantMessage, handleIntentRouted, appendCurrentWorkflowEvent, setCurrentWorkflowEvents, handleWorkflowStep, handleInfoNeeded, handleToolCall, handleProcessing, handleAnalysisResult, handleUIBlockUpdate, handleThinking, handleThinkingEnd, handleAgentExecutionStart, handleAgentStepUpdate, handleAgentExecutionFinish, flushThinking, resetThinkingBuffer]);
+  }, [getCurrentAgentConfig, addAssistantMessage, setStreaming, updateLastAssistantMessage, ensureAssistantMessage, handleIntentRouted, appendCurrentWorkflowEvent, setCurrentWorkflowEvents, handleWorkflowStep, handleInfoNeeded, handleToolCall, handleProcessing, handleAnalysisResult, handleUIBlockUpdate, handleThinking, handleThinkingEnd, handleAgentExecutionStart, handleAgentStepUpdate, handleAgentExecutionFinish, flushThinking, resetThinkingBuffer]);
 
   const streamResume = useCallback(async (params: {
     threadId: string;

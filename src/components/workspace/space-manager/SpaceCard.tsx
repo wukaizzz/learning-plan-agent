@@ -25,20 +25,21 @@ interface SpaceCardProps {
 export const SpaceCard: React.FC<SpaceCardProps> = ({ space }) => {
   const navigate = useNavigate();
   const { switchSpace } = useSpaceStore();
+  const [renderTimestamp] = React.useState(() => Date.now());
   const statusConfig = getWorkspaceStatusConfig(space.status);
   const progress = clampProgress(space.stats.overallProgress);
   const advice = getSpaceAdvice(space);
 
   const handleCardClick = () => {
     switchSpace(space.id);
-    navigate(`/workSpace/${space.id}`);
+    navigate(`/workSpace/${space.id}/overview`);
   };
 
   const formatUpdateTime = (time: Date | string | number) => {
     const timestamp = new Date(time).getTime();
     if (!Number.isFinite(timestamp)) return '最近';
 
-    const diff = Date.now() - timestamp;
+    const diff = renderTimestamp - timestamp;
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);

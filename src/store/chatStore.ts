@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { ChatStore, Message, ChatSession, WorkspaceState, UIBlock } from '@/types'
+import { extractPlanFromUIBlocks, PLAN_BLOCK_TYPES } from '@/utils/planBlockAdapter';
 import { traceAgent } from '@/shared/debug/agentTrace';
 const generateId = () => `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
@@ -11,24 +12,23 @@ const messageHasCollectionForm = (message: Message) =>
 const messageHasWorkflowProcess = (message: Message) =>
   !!message.workflow_process_steps?.length;
 
-const shouldPersistWorkflowEvent = (
-  event: NonNullable<Message['workflow_events']>[number]
-) => event.type !== 'thinking' && event.type !== 'thinking_end';
+// shouldPersistWorkflowEvent removed in v4 — workflow_events no longer persisted
 
 const sanitizeMessageForStorage = (message: Message): Message => {
-  const workflowEvents = message.workflow_events?.filter(shouldPersistWorkflowEvent);
-  const nextMessage: Message = {
-    ...message,
-    thinkingActive: false
+  // v4 瘦身：删除 workflow_events、thinkingContent、thinkingDuration、完整 agent_execution
+  // 只保留 collection-form 用于表单恢复
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    timestamp: message.timestamp,
+    tool_calls: message.tool_calls,
+    ui_blocks: message.ui_blocks?.filter(b => b.type === 'collection-form'),
+    submitted_form_summary: message.submitted_form_summary,
+    form_submission_state: message.form_submission_state,
+    workflow_process_steps: message.workflow_process_steps,
+    thinkingActive: false,
   };
-
-  if (workflowEvents && workflowEvents.length > 0) {
-    nextMessage.workflow_events = workflowEvents;
-  } else {
-    delete nextMessage.workflow_events;
-  }
-
-  return nextMessage;
 };
 
 const sanitizeSessionForStorage = (session: ChatSession): ChatSession => ({
@@ -73,6 +73,93 @@ const createLegacySession = (
 
 const normalizeMessageRuntimeFields = (message: Message) => {
   message.thinkingActive = false;
+};
+
+/**
+ * v3 → v4 迁移：从旧 session messages 的 workflow_events 提取计划数据
+ * 写入 plan-storage（localStorage），然后瘦身 messages
+ *
+ * 关键修正：按 space 只取最新一条含计划 blocks 的 assistant message，不累积
+ */
+const migrateV3ToV4PlanData = (sessions: unknown[]) => {
+  try {
+    // 按 spaceId 分组，每组取最新含计划 blocks 的 message
+    const spacePlanBlocks = new Map<string, { blocks: any[]; sessionId?: string; messageId?: string }>();
+
+    for (const session of sessions) {
+      const s = session as Record<string, unknown>;
+      const spaceId = s.spaceId as string | null;
+      if (!spaceId) continue;
+
+      const messages = Array.isArray(s.messages) ? s.messages : [];
+      // 从最新 assistant message 往前找第一条含计划 blocks 的
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i] as Record<string, unknown>;
+        if (msg.role !== 'assistant') continue;
+
+        const events = Array.isArray(msg.workflow_events) ? msg.workflow_events : [];
+        const planBlocks: any[] = [];
+
+        for (const event of events) {
+          const e = event as Record<string, unknown>;
+          if (e.type === 'ui_block_update' && (e.action === 'add' || e.action === 'update') && e.block) {
+            const block = e.block as Record<string, unknown>;
+            if (PLAN_BLOCK_TYPES.has(block.type as string)) {
+              // 去重：同 id 的 block 只保留最新
+              const existingIdx = planBlocks.findIndex((b: any) => b.id === block.id);
+              if (existingIdx >= 0) {
+                planBlocks[existingIdx] = block;
+              } else {
+                planBlocks.push(block);
+              }
+            }
+          }
+        }
+
+        if (planBlocks.length > 0) {
+          // 只保留最新的一条 message 的 blocks（不累积旧计划）
+          if (!spacePlanBlocks.has(spaceId)) {
+            spacePlanBlocks.set(spaceId, {
+              blocks: planBlocks,
+              sessionId: s.id as string,
+              messageId: msg.id as string,
+            });
+          }
+          break; // 找到最新的就够了
+        }
+      }
+    }
+
+    // 写入 plan-storage
+    if (spacePlanBlocks.size > 0) {
+      try {
+        const planStorage = localStorage.getItem('plan-storage');
+        const existing = planStorage ? JSON.parse(planStorage) : { plans: [], tasks: [], blocks: [], executions: [], version: 1 };
+
+        for (const [spaceId, data] of spacePlanBlocks) {
+          const extracted = extractPlanFromUIBlocks(spaceId, data.blocks, {
+            sessionId: data.sessionId,
+            messageId: data.messageId,
+          });
+          if (extracted) {
+            extracted.plan.status = 'active'; // 旧数据已经是生成完毕的
+            // 移除同 space 的旧 plan
+            existing.plans = existing.plans.filter((p: any) => p.spaceId !== spaceId);
+            existing.plans.push(extracted.plan);
+            existing.tasks.push(...extracted.tasks);
+            existing.blocks.push(...extracted.blocks);
+          }
+        }
+
+        localStorage.setItem('plan-storage', JSON.stringify(existing));
+        console.log(`[migrateV3ToV4] Migrated plan data for ${spacePlanBlocks.size} spaces`);
+      } catch (e) {
+        console.error('[migrateV3ToV4] Failed to write plan-storage:', e);
+      }
+    }
+  } catch (e) {
+    console.error('[migrateV3ToV4] Migration failed:', e);
+  }
 };
 
 export const useChatStore = create<ChatStore>()(
@@ -707,8 +794,8 @@ export const useChatStore = create<ChatStore>()(
     })),
     {
       name: 'chat-storage',
-      version: 3,
-      migrate: (persistedState: unknown) => {
+      version: 4,
+      migrate: (persistedState: unknown, version?: number) => {
         if (!persistedState || typeof persistedState !== 'object') {
           return persistedState as Record<string, unknown>;
         }
@@ -720,6 +807,11 @@ export const useChatStore = create<ChatStore>()(
         const legacyMessages = Array.isArray(state.messages)
           ? state.messages
           : [];
+
+        // v3 → v4：提取旧 workflow_events 中的计划数据写入 plan-storage
+        if (version !== undefined && version < 4 && sessions.length > 0) {
+          migrateV3ToV4PlanData(sessions);
+        }
 
         if (sessions.length === 0 && legacyMessages.length > 0) {
           const legacySession = createLegacySession(
