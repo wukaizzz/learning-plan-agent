@@ -96,11 +96,11 @@ export const SummaryCard: React.FC<SummaryCardComponentProps> = ({
         <div className="summary-item summary-item-progress">
           <div className="summary-item-label">
             <span>整体进度</span>
-            <span className="progress-percentage">{overallProgress}%</span>
+            <span className="summary-progress-percentage">{overallProgress}%</span>
           </div>
-          <div className="progress-bar-container">
+          <div className="summary-progress-track">
             <div
-              className="progress-bar-fill"
+              className="summary-progress-fill"
               style={{
                 width: `${overallProgress}%`,
                 backgroundColor: getProgressColor(overallProgress)

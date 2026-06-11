@@ -1,15 +1,63 @@
 /**
  * DailyTaskList UI Block
- * 显示每日学习任务列表
+ * Displays the daily study task list and persists task status updates.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { DailyTaskItem, DailyTaskListProps } from '@/types/uiBlocks';
+import { usePlanStore } from '@/store/planStore';
 import './DailyTaskList.css';
 
 interface DailyTaskListComponentProps extends DailyTaskListProps {
   title?: string;
 }
+
+type TaskStatus = DailyTaskItem['status'];
+
+const statusFlow: Record<TaskStatus, TaskStatus> = {
+  pending: 'in_progress',
+  in_progress: 'completed',
+  completed: 'pending',
+  skipped: 'pending'
+};
+
+const getPriorityClass = (priority: string): string => {
+  const priorityMap: Record<string, string> = {
+    high: 'priority-high',
+    medium: 'priority-medium',
+    low: 'priority-low'
+  };
+  return priorityMap[priority] || 'priority-medium';
+};
+
+const getStatusClass = (status: TaskStatus): string => {
+  const statusMap: Record<TaskStatus, string> = {
+    pending: 'status-pending',
+    in_progress: 'status-in-progress',
+    completed: 'status-completed',
+    skipped: 'status-skipped'
+  };
+  return statusMap[status] || 'status-pending';
+};
+
+const getStatusIcon = (status: TaskStatus): string => {
+  const iconMap: Record<TaskStatus, string> = {
+    pending: '○',
+    in_progress: '◐',
+    completed: '●',
+    skipped: '⊘'
+  };
+  return iconMap[status] || '○';
+};
+
+const formatDuration = (minutes: number): string => {
+  if (minutes < 60) {
+    return `${minutes}分钟`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins > 0 ? `${hours}小时${mins}分钟` : `${hours}小时`;
+};
 
 export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
   title = '每日任务',
@@ -21,6 +69,9 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
   scheduleGroups
 }) => {
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const [taskStates, setTaskStates] = useState<Record<string, TaskStatus>>({});
+  const taskStatesRef = useRef<Record<string, TaskStatus>>({});
+
   const allTaskItems = useMemo(() => {
     const byId = new Map<string, DailyTaskItem>();
     for (const task of tasks) {
@@ -36,73 +87,38 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
     return Array.from(byId.values());
   }, [tasks, scheduleGroups]);
 
-  const [taskStates, setTaskStates] = useState<Record<string, 'pending' | 'in_progress' | 'completed' | 'skipped'>>({});
+  useEffect(() => {
+    taskStatesRef.current = {};
+    setTaskStates({});
+  }, [allTaskItems]);
 
-  // 获取优先级样式
-  const getPriorityClass = (priority: string): string => {
-    const priorityMap: Record<string, string> = {
-      high: 'priority-high',
-      medium: 'priority-medium',
-      low: 'priority-low'
-    };
-    return priorityMap[priority] || 'priority-medium';
+  const getCurrentTaskStatus = (taskId: string): TaskStatus => {
+    return taskStatesRef.current[taskId] || allTaskItems.find(task => task.id === taskId)?.status || 'pending';
   };
 
-  // 获取状态样式
-  const getStatusClass = (status: string): string => {
-    const statusMap: Record<string, string> = {
-      pending: 'status-pending',
-      in_progress: 'status-in-progress',
-      completed: 'status-completed',
-      skipped: 'status-skipped'
-    };
-    return statusMap[status] || 'status-pending';
+  const getTaskStatus = (task: DailyTaskItem): TaskStatus => {
+    return taskStates[task.id] || task.status;
   };
 
-  // 获取状态图标
-  const getStatusIcon = (status: string): string => {
-    const iconMap: Record<string, string> = {
-      pending: '○',
-      in_progress: '◐',
-      completed: '●',
-      skipped: '⊘'
-    };
-    return iconMap[status] || '○';
+  const commitTaskStatus = (taskId: string, newStatus: TaskStatus) => {
+    const nextTaskStates = { ...taskStatesRef.current, [taskId]: newStatus };
+    taskStatesRef.current = nextTaskStates;
+    setTaskStates(nextTaskStates);
+    usePlanStore.getState().updateTaskStatus(taskId, newStatus);
   };
 
-  // 切换任务状态
   const toggleTaskStatus = (taskId: string) => {
-    setTaskStates(prev => {
-      const currentStatus = prev[taskId] || allTaskItems.find(task => task.id === taskId)?.status || 'pending';
-      const statusFlow: Record<string, string> = {
-        pending: 'in_progress',
-        in_progress: 'completed',
-        completed: 'pending',
-        skipped: 'pending'
-      };
-      return {
-        ...prev,
-        [taskId]: (statusFlow[currentStatus] || 'pending') as 'pending' | 'in_progress' | 'completed' | 'skipped'
-      };
-    });
+    const currentStatus = getCurrentTaskStatus(taskId);
+    commitTaskStatus(taskId, statusFlow[currentStatus] || 'pending');
   };
 
-  // 计算完成进度
-  const getTaskStatus = (task: DailyTaskItem) => taskStates[task.id] || task.status;
+  const completeTaskStatus = (taskId: string) => {
+    commitTaskStatus(taskId, 'completed');
+  };
+
   const completedCount = tasks.filter(task => getTaskStatus(task) === 'completed').length;
   const totalCount = tasks.length;
   const currentCompletionRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-
-  // 格式化时长
-  const formatDuration = (minutes: number): string => {
-    if (minutes < 60) {
-      return `${minutes}分钟`;
-    }
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}小时${mins}分钟` : `${hours}小时`;
-  };
-
   const visibleTaskCount = displayedTaskCount ?? tasks.length;
   const plannedTaskCount = totalTaskCount ?? allTaskItems.length;
   const hasFullSchedule = !!scheduleGroups?.length && plannedTaskCount > visibleTaskCount;
@@ -114,6 +130,11 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
         key={task.id}
         className={`task-item ${getPriorityClass(task.priority)} ${getStatusClass(taskStatus)} ${className}`.trim()}
         onClick={() => toggleTaskStatus(task.id)}
+        onDoubleClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          completeTaskStatus(task.id);
+        }}
       >
         <div className="task-checkbox">
           <span className="task-status-icon">{getStatusIcon(taskStatus)}</span>
@@ -122,14 +143,16 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
         <div className="task-content">
           <div className="task-header">
             <span className="task-subject">{task.subject}</span>
-            <span className="task-priority-badge">{task.priority === 'high' ? '重要' : task.priority === 'medium' ? '中等' : '普通'}</span>
+            <span className="task-priority-badge">
+              {task.priority === 'high' ? '重要' : task.priority === 'medium' ? '中等' : '普通'}
+            </span>
           </div>
           <div className="task-title">{task.task}</div>
           <div className="task-meta">
             {task.estimatedTime && (
-              <span className="task-time">🕐 {task.estimatedTime}</span>
+              <span className="task-time">时间 {task.estimatedTime}</span>
             )}
-            <span className="task-duration">⏱️ {formatDuration(task.duration)}</span>
+            <span className="task-duration">时长 {formatDuration(task.duration)}</span>
           </div>
         </div>
       </div>
@@ -155,7 +178,6 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
         </div>
       </div>
 
-      {/* 进度条 */}
       <div className="daily-task-progress">
         <div
           className="daily-task-progress-bar"
@@ -163,13 +185,12 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
         />
       </div>
 
-      {/* 任务列表 */}
       <div className="daily-task-items">
         {tasks.map(task => renderTaskItem(task))}
 
         {tasks.length === 0 && (
           <div className="task-empty">
-            <div className="empty-icon">📋</div>
+            <div className="empty-icon">--</div>
             <p>今天没有安排任务</p>
           </div>
         )}

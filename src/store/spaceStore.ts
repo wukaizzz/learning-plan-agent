@@ -119,7 +119,7 @@ export const useSpaceStore = create<SpaceStore>()(
         set((state) => {
           const space = state.spaces.find(s => s.id === spaceId);
           if (space) {
-            Object.assign(space.stats, statsUpdate);
+            space.stats = { ...space.stats, ...statsUpdate };
             space.updatedAt = new Date();
           }
         });

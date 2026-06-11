@@ -669,7 +669,7 @@ export const useChatStore = create<ChatStore>()(
       }),
 
       setUIBlocks: (blocks: UIBlock[]) => set((state) => {
-        if (state.uiBlocks !== blocks && state.uiBlocks.length !== blocks.length) {
+        if (state.uiBlocks !== blocks) {
           state.uiBlocks = blocks;
         }
       }),

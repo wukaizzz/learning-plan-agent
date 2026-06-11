@@ -258,13 +258,20 @@ function hydrateTaskBlock(
       tasks: groupTasks,
     }));
 
+  // 恢复 props.tasks 为当日任务子集（后端 selectDisplayTasks 只返回当天任务）
+  // 如果 blockDate 为空或当天无任务，fallback 到全部 tasks
+  const blockDate = (block.props.date as string) || '';
+  const todayItems = blockDate
+    ? dailyItems.filter((_, idx) => matchedTasks[idx]?.scheduledDate === blockDate)
+    : dailyItems;
+
   return {
     id: block.id,
     type: block.type,
     title: block.title,
     props: {
       ...block.props,
-      tasks: dailyItems,
+      tasks: todayItems.length > 0 ? todayItems : dailyItems,
       scheduleGroups,
     },
   };

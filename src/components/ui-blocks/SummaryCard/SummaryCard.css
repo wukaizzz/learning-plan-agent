@@ -122,19 +122,19 @@
   align-items: center;
 }
 
-.progress-percentage {
+.summary-progress-percentage {
   font-weight: 600;
   color: #1f2937;
 }
 
-.progress-bar-container {
+.summary-progress-track {
   height: 8px;
   background: #e5e7eb;
   border-radius: 4px;
   overflow: hidden;
 }
 
-.progress-bar-fill {
+.summary-progress-fill {
   height: 100%;
   border-radius: 4px;
   transition: width 0.3s ease;
