@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, Timer, XCircle } from 'lucide-react';
 import type { DailyTaskItem, DailyTaskListProps } from '@/types/uiBlocks';
 import { usePlanStore } from '@/store/planStore';
 import './DailyTaskList.css';
@@ -13,13 +14,6 @@ interface DailyTaskListComponentProps extends DailyTaskListProps {
 }
 
 type TaskStatus = DailyTaskItem['status'];
-
-const statusFlow: Record<TaskStatus, TaskStatus> = {
-  pending: 'in_progress',
-  in_progress: 'completed',
-  completed: 'pending',
-  skipped: 'pending'
-};
 
 const getPriorityClass = (priority: string): string => {
   const priorityMap: Record<string, string> = {
@@ -59,6 +53,25 @@ const formatDuration = (minutes: number): string => {
   return mins > 0 ? `${hours}小时${mins}分钟` : `${hours}小时`;
 };
 
+const getTaskDurationSeconds = (task: DailyTaskItem): number => {
+  return Math.max(1, Math.round(task.duration * 60));
+};
+
+const formatCountdown = (seconds: number): string => {
+  const safeSeconds = Math.max(0, seconds);
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const remainingSeconds = safeSeconds % 60;
+  const paddedMinutes = String(minutes).padStart(2, '0');
+  const paddedSeconds = String(remainingSeconds).padStart(2, '0');
+
+  if (hours > 0) {
+    return `${hours}:${paddedMinutes}:${paddedSeconds}`;
+  }
+
+  return `${paddedMinutes}:${paddedSeconds}`;
+};
+
 export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
   title = '每日任务',
   date,
@@ -70,7 +83,12 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
 }) => {
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [taskStates, setTaskStates] = useState<Record<string, TaskStatus>>({});
+  const [focusTask, setFocusTask] = useState<DailyTaskItem | null>(null);
+  const [focusTotalSeconds, setFocusTotalSeconds] = useState(0);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const [isFocusExpired, setIsFocusExpired] = useState(false);
   const taskStatesRef = useRef<Record<string, TaskStatus>>({});
+  const clickTimerRef = useRef<number | null>(null);
 
   const allTaskItems = useMemo(() => {
     const byId = new Map<string, DailyTaskItem>();
@@ -92,6 +110,32 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
     setTaskStates({});
   }, [allTaskItems]);
 
+  useEffect(() => {
+    return () => {
+      if (clickTimerRef.current !== null) {
+        window.clearTimeout(clickTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!focusTask || isFocusExpired) {
+      return;
+    }
+
+    const timerId = window.setInterval(() => {
+      setRemainingSeconds(current => Math.max(current - 1, 0));
+    }, 1000);
+
+    return () => window.clearInterval(timerId);
+  }, [focusTask, isFocusExpired]);
+
+  useEffect(() => {
+    if (focusTask && remainingSeconds === 0) {
+      setIsFocusExpired(true);
+    }
+  }, [focusTask, remainingSeconds]);
+
   const getCurrentTaskStatus = (taskId: string): TaskStatus => {
     return taskStatesRef.current[taskId] || allTaskItems.find(task => task.id === taskId)?.status || 'pending';
   };
@@ -107,13 +151,62 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
     usePlanStore.getState().updateTaskStatus(taskId, newStatus);
   };
 
-  const toggleTaskStatus = (taskId: string) => {
-    const currentStatus = getCurrentTaskStatus(taskId);
-    commitTaskStatus(taskId, statusFlow[currentStatus] || 'pending');
+  const clearPendingTaskClick = () => {
+    if (clickTimerRef.current !== null) {
+      window.clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+    }
+  };
+
+  const closeFocusSession = () => {
+    setFocusTask(null);
+    setFocusTotalSeconds(0);
+    setRemainingSeconds(0);
+    setIsFocusExpired(false);
+  };
+
+  const startFocusSession = (task: DailyTaskItem) => {
+    const currentStatus = getCurrentTaskStatus(task.id);
+    if (currentStatus !== 'in_progress') {
+      commitTaskStatus(task.id, 'in_progress');
+    }
+
+    const totalSeconds = getTaskDurationSeconds(task);
+    setFocusTask(task);
+    setFocusTotalSeconds(totalSeconds);
+    setRemainingSeconds(totalSeconds);
+    setIsFocusExpired(false);
+  };
+
+  const handleTaskClick = (task: DailyTaskItem) => {
+    const currentStatus = getCurrentTaskStatus(task.id);
+    if (currentStatus === 'completed') {
+      commitTaskStatus(task.id, 'pending');
+      return;
+    }
+
+    startFocusSession(task);
+  };
+
+  const scheduleTaskClick = (task: DailyTaskItem) => {
+    clearPendingTaskClick();
+    clickTimerRef.current = window.setTimeout(() => {
+      clickTimerRef.current = null;
+      handleTaskClick(task);
+    }, 220);
   };
 
   const completeTaskStatus = (taskId: string) => {
     commitTaskStatus(taskId, 'completed');
+    if (focusTask?.id === taskId) {
+      closeFocusSession();
+    }
+  };
+
+  const abandonFocusSession = () => {
+    if (!focusTask) return;
+    commitTaskStatus(focusTask.id, 'pending');
+    closeFocusSession();
   };
 
   const completedCount = tasks.filter(task => getTaskStatus(task) === 'completed').length;
@@ -122,6 +215,9 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
   const visibleTaskCount = displayedTaskCount ?? tasks.length;
   const plannedTaskCount = totalTaskCount ?? allTaskItems.length;
   const hasFullSchedule = !!scheduleGroups?.length && plannedTaskCount > visibleTaskCount;
+  const focusProgress = focusTotalSeconds > 0
+    ? Math.round((focusTotalSeconds - remainingSeconds) / focusTotalSeconds * 100)
+    : 0;
 
   const renderTaskItem = (task: DailyTaskItem, className = '') => {
     const taskStatus = getTaskStatus(task);
@@ -129,10 +225,11 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
       <div
         key={task.id}
         className={`task-item ${getPriorityClass(task.priority)} ${getStatusClass(taskStatus)} ${className}`.trim()}
-        onClick={() => toggleTaskStatus(task.id)}
+        onClick={() => scheduleTaskClick(task)}
         onDoubleClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
+          clearPendingTaskClick();
           completeTaskStatus(task.id);
         }}
       >
@@ -153,6 +250,76 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
               <span className="task-time">时间 {task.estimatedTime}</span>
             )}
             <span className="task-duration">时长 {formatDuration(task.duration)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderFocusTimer = () => {
+    if (!focusTask) return null;
+
+    return (
+      <div
+        className="daily-task-focus-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="daily-task-focus-title"
+      >
+        <div className="daily-task-focus-dialog">
+          <div className="daily-task-focus-header">
+            <div className="daily-task-focus-icon" aria-hidden="true">
+              <Timer size={24} />
+            </div>
+            <div className="daily-task-focus-heading">
+              <div className="daily-task-focus-kicker">
+                {isFocusExpired ? '计划时间已结束' : '专注进行中'}
+              </div>
+              <h3 id="daily-task-focus-title" className="daily-task-focus-title">
+                {focusTask.task}
+              </h3>
+            </div>
+          </div>
+
+          <div className="daily-task-focus-meta">
+            <span>{focusTask.subject}</span>
+            <span>{formatDuration(focusTask.duration)}</span>
+          </div>
+
+          <div className="daily-task-focus-time" aria-live="polite">
+            {formatCountdown(remainingSeconds)}
+          </div>
+
+          <div className="daily-task-focus-track" aria-hidden="true">
+            <div
+              className="daily-task-focus-fill"
+              style={{ width: `${focusProgress}%` }}
+            />
+          </div>
+
+          <p className="daily-task-focus-hint">
+            {isFocusExpired
+              ? '本次计划时间已到，请根据实际完成情况结束任务。'
+              : '计时期间请保持专注，完成后再返回对话和计划。'}
+          </p>
+
+          <div className="daily-task-focus-actions">
+            <button
+              type="button"
+              className="daily-task-focus-button daily-task-focus-button-complete"
+              onClick={() => completeTaskStatus(focusTask.id)}
+            >
+              <CheckCircle2 size={18} />
+              提前完成
+            </button>
+            <button
+              type="button"
+              className="daily-task-focus-button daily-task-focus-button-abandon"
+              onClick={abandonFocusSession}
+            >
+              <XCircle size={18} />
+              放弃本次专注
+            </button>
           </div>
         </div>
       </div>
@@ -225,6 +392,8 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
           ))}
         </div>
       )}
+
+      {renderFocusTimer()}
     </div>
   );
 };
