@@ -11,6 +11,7 @@
 
 import type { UIBlock, DailyTaskItem, DailyScheduleGroup } from '@/types/uiBlocks';
 import type { Plan, StudyTask, PlanBlock } from '@/types/plan';
+import { computeDaysRemaining, getLocalDateString } from '@/utils/dateUtils';
 
 /** 计划相关 block 类型 */
 export const PLAN_BLOCK_TYPES = new Set([
@@ -34,6 +35,31 @@ interface ExtractedPlan {
   plan: Plan;
   tasks: StudyTask[];
   blocks: PlanBlock[];
+}
+
+export function normalizeSummaryCardProps(props: Record<string, unknown>): Record<string, unknown> {
+  if (typeof props.examDate !== 'string') {
+    return props;
+  }
+
+  const fallback = typeof props.daysRemaining === 'number' ? props.daysRemaining : 0;
+  const daysRemaining = computeDaysRemaining(props.examDate, fallback);
+
+  return {
+    ...props,
+    daysRemaining,
+  };
+}
+
+export function normalizePlanUIBlock(block: UIBlock): UIBlock {
+  if (block.type !== 'summary-card') {
+    return block;
+  }
+
+  return {
+    ...block,
+    props: normalizeSummaryCardProps(block.props as Record<string, unknown>),
+  };
 }
 
 // ============= 提取（UIBlock → Plan + StudyTask + PlanBlock） =============
@@ -118,7 +144,11 @@ function extractTasksFromBlock(
 
   // 先提取顶层 tasks
   for (const t of propsTasks) {
-    taskMap.set(t.id, { item: t, scheduledDate: blockDate });
+    taskMap.set(t.id, {
+      item: t,
+      scheduledDate: t.scheduledDate || blockDate,
+      groupLabel: t.groupLabel,
+    });
   }
 
   // 再提取 scheduleGroups 中的 tasks，补充 scheduledDate 和 groupLabel
@@ -133,7 +163,7 @@ function extractTasksFromBlock(
       } else {
         // 已存在：补上 scheduledDate 和 groupLabel（如果原来没有）
         const existing = taskMap.get(t.id)!;
-        if (existing.scheduledDate === blockDate && group.date) {
+        if ((!existing.scheduledDate || existing.scheduledDate === blockDate) && group.date) {
           existing.scheduledDate = group.date;
         }
         if (!existing.groupLabel && group.label) {
@@ -205,7 +235,9 @@ export function hydrateUIBlocksFromPlan(
         id: block.id,
         type: block.type,
         title: block.title,
-        props: { ...block.props },
+        props: block.type === 'summary-card'
+          ? normalizeSummaryCardProps({ ...block.props })
+          : { ...block.props },
       };
     });
 }
@@ -222,8 +254,13 @@ function hydrateTaskBlock(
     .map(id => taskMap.get(id))
     .filter((t): t is StudyTask => t !== undefined);
 
-  // StudyTask → DailyTaskItem
-  const dailyItems: DailyTaskItem[] = matchedTasks.map(t => ({
+  const sortedTasks = [...matchedTasks].sort((a, b) => {
+    const dateDiff = a.scheduledDate.localeCompare(b.scheduledDate);
+    if (dateDiff !== 0) return dateDiff;
+    return a.order - b.order;
+  });
+
+  const toDailyTaskItem = (t: StudyTask): DailyTaskItem => ({
     id: t.id,
     subject: t.subject,
     task: t.title,
@@ -231,24 +268,18 @@ function hydrateTaskBlock(
     priority: t.priority,
     status: t.status,
     estimatedTime: t.estimatedTime,
-  }));
+    scheduledDate: t.scheduledDate,
+    groupLabel: t.groupLabel,
+  });
 
   // 按 scheduledDate 分组重建 DailyScheduleGroup[]
   const groupsByDate = new Map<string, { label: string; tasks: DailyTaskItem[] }>();
-  for (const t of matchedTasks) {
+  for (const t of sortedTasks) {
     const date = t.scheduledDate;
     if (!groupsByDate.has(date)) {
       groupsByDate.set(date, { label: t.groupLabel || date, tasks: [] });
     }
-    groupsByDate.get(date)!.tasks.push({
-      id: t.id,
-      subject: t.subject,
-      task: t.title,
-      duration: t.estimatedMinutes,
-      priority: t.priority,
-      status: t.status,
-      estimatedTime: t.estimatedTime,
-    });
+    groupsByDate.get(date)!.tasks.push(toDailyTaskItem(t));
   }
 
   const scheduleGroups: DailyScheduleGroup[] = Array.from(groupsByDate.entries())
@@ -258,12 +289,26 @@ function hydrateTaskBlock(
       tasks: groupTasks,
     }));
 
-  // 恢复 props.tasks 为当日任务子集（后端 selectDisplayTasks 只返回当天任务）
-  // 如果 blockDate 为空或当天无任务，fallback 到全部 tasks
-  const blockDate = (block.props.date as string) || '';
-  const todayItems = blockDate
-    ? dailyItems.filter((_, idx) => matchedTasks[idx]?.scheduledDate === blockDate)
-    : dailyItems;
+  const today = getLocalDateString();
+  const overdueFailedTasks = sortedTasks.filter(task =>
+    task.status === 'failed' && !!task.scheduledDate && task.scheduledDate < today
+  );
+  const todayTasks = sortedTasks.filter(task => task.scheduledDate === today);
+  let displayedTasks = [...overdueFailedTasks, ...todayTasks];
+  let displayDate = today;
+
+  if (displayedTasks.length === 0) {
+    const futureTask = sortedTasks.find(task => task.scheduledDate >= today);
+    displayDate = futureTask?.scheduledDate || sortedTasks[0]?.scheduledDate || today;
+    displayedTasks = sortedTasks.filter(task => task.scheduledDate === displayDate);
+  }
+
+  const displayedItems = displayedTasks.map(toDailyTaskItem);
+  const completedCount = displayedTasks.filter(task => task.status === 'completed').length;
+  const completionRate = displayedTasks.length > 0
+    ? Math.round((completedCount / displayedTasks.length) * 100)
+    : 0;
+  const totalDuration = displayedTasks.reduce((sum, task) => sum + task.estimatedMinutes, 0);
 
   return {
     id: block.id,
@@ -271,8 +316,13 @@ function hydrateTaskBlock(
     title: block.title,
     props: {
       ...block.props,
-      tasks: todayItems.length > 0 ? todayItems : dailyItems,
+      date: displayDate,
+      tasks: displayedItems,
       scheduleGroups,
+      totalTaskCount: sortedTasks.length,
+      displayedTaskCount: displayedItems.length,
+      totalDuration,
+      completionRate,
     },
   };
 }

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { ChatStore, Message, ChatSession, WorkspaceState, UIBlock } from '@/types'
-import { extractPlanFromUIBlocks, PLAN_BLOCK_TYPES } from '@/utils/planBlockAdapter';
+import { extractPlanFromUIBlocks, normalizePlanUIBlock, PLAN_BLOCK_TYPES } from '@/utils/planBlockAdapter';
 import { traceAgent } from '@/shared/debug/agentTrace';
 const generateId = () => `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
@@ -670,12 +670,20 @@ export const useChatStore = create<ChatStore>()(
 
       setUIBlocks: (blocks: UIBlock[]) => set((state) => {
         if (state.uiBlocks !== blocks) {
-          state.uiBlocks = blocks;
+          state.uiBlocks = blocks.map(normalizePlanUIBlock);
         }
       }),
 
       addUIBlock: (block: UIBlock) => set((state) => {
-        state.uiBlocks.push(block);
+        const normalizedBlock = normalizePlanUIBlock(block);
+        const existingIndex = state.uiBlocks.findIndex(existing => existing.id === normalizedBlock.id);
+
+        if (existingIndex >= 0) {
+          state.uiBlocks[existingIndex] = normalizedBlock;
+          return;
+        }
+
+        state.uiBlocks.push(normalizedBlock);
       }),
 
       clearUIBlocks: () => set((state) => {

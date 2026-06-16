@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router';
-import { LoadingSpinner } from '../common/LoadingSpinner';
 import { MessageList, MessageInput } from '@/components/chat/message';
 import { WorkflowSection } from './WorkflowSection';
 import { WorkflowResumePrompt } from '@/components/workflow-resume/WorkflowResumePrompt';
@@ -303,12 +302,6 @@ export const ChatPanel: React.FC = () => {
                 </p>
               </div>
             </div>
-            {isStreaming && (
-              <div className="chat-panel-streaming">
-                <LoadingSpinner size="sm" />
-                <span className="chat-panel-streaming-text">Thinking...</span>
-              </div>
-            )}
           </div>
         </div>
 

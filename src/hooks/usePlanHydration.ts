@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useChatStore } from '@/store/chatStore';
 import { usePlanStore } from '@/store/planStore';
 import { hydrateUIBlocksFromPlan } from '@/utils/planBlockAdapter';
+import { getLocalDateString } from '@/utils/dateUtils';
 import { isPlanGenerationState } from '@/components/study-space/spacePlanStatus';
 import type { UIBlock } from '@/types/uiBlocks';
 
@@ -25,6 +26,12 @@ export function usePlanHydration(spaceId: string | undefined): UsePlanHydrationR
   const plans = usePlanStore(state => state.plans);
   const tasks = usePlanStore(state => state.tasks);
   const blocks = usePlanStore(state => state.blocks);
+  const rolloverOverdueTasks = usePlanStore(state => state.rolloverOverdueTasks);
+
+  useEffect(() => {
+    if (!spaceId) return;
+    rolloverOverdueTasks(spaceId, getLocalDateString());
+  }, [spaceId, rolloverOverdueTasks]);
 
   const isActivelyStreaming =
     currentChatSpaceId === spaceId && isPlanGenerationState(workspaceState);

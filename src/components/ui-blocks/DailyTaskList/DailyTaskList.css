@@ -138,6 +138,11 @@
   border-color: #3b82f6;
 }
 
+.task-item.status-failed {
+  background: #fef2f2;
+  border-color: #f87171;
+}
+
 .task-checkbox {
   display: flex;
   align-items: flex-start;
@@ -155,6 +160,11 @@
 
 .status-in-progress .task-status-icon {
   color: #3b82f6;
+}
+
+.status-failed .task-status-icon {
+  color: #dc2626;
+  font-weight: 700;
 }
 
 .task-content {
@@ -219,10 +229,16 @@
 }
 
 .task-time,
-.task-duration {
+.task-duration,
+.task-plan-date {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.task-plan-date {
+  color: #b91c1c;
+  font-weight: 600;
 }
 
 .task-empty {

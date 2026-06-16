@@ -29,13 +29,18 @@ const getStatusClass = (status: TaskStatus): string => {
     pending: 'status-pending',
     in_progress: 'status-in-progress',
     completed: 'status-completed',
-    skipped: 'status-skipped'
+    skipped: 'status-skipped',
+    failed: 'status-failed'
   };
   return statusMap[status] || 'status-pending';
 };
 
 const getStatusIcon = (status: TaskStatus): string => {
-  const iconMap: Record<TaskStatus, string> = {
+  if (status === 'failed') {
+    return '!';
+  }
+
+  const iconMap: Partial<Record<TaskStatus, string>> = {
     pending: '○',
     in_progress: '◐',
     completed: '●',
@@ -89,6 +94,7 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
   const [isFocusExpired, setIsFocusExpired] = useState(false);
   const taskStatesRef = useRef<Record<string, TaskStatus>>({});
   const clickTimerRef = useRef<number | null>(null);
+  const preFocusStatusRef = useRef<TaskStatus>('pending');
 
   const allTaskItems = useMemo(() => {
     const byId = new Map<string, DailyTaskItem>();
@@ -167,6 +173,8 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
 
   const startFocusSession = (task: DailyTaskItem) => {
     const currentStatus = getCurrentTaskStatus(task.id);
+    preFocusStatusRef.current = currentStatus;
+
     if (currentStatus !== 'in_progress') {
       commitTaskStatus(task.id, 'in_progress');
     }
@@ -205,7 +213,7 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
 
   const abandonFocusSession = () => {
     if (!focusTask) return;
-    commitTaskStatus(focusTask.id, 'pending');
+    commitTaskStatus(focusTask.id, preFocusStatusRef.current);
     closeFocusSession();
   };
 
@@ -248,6 +256,9 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
           <div className="task-meta">
             {task.estimatedTime && (
               <span className="task-time">时间 {task.estimatedTime}</span>
+            )}
+            {taskStatus === 'failed' && task.scheduledDate && (
+              <span className="task-plan-date">计划日期 {task.groupLabel || task.scheduledDate}</span>
             )}
             <span className="task-duration">时长 {formatDuration(task.duration)}</span>
           </div>

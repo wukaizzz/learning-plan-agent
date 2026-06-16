@@ -60,8 +60,10 @@ const DailyTaskItemSchema = z.object({
   task: z.string(),
   duration: z.number(),
   priority: z.enum(['high', 'medium', 'low']),
-  status: z.enum(['pending', 'in_progress', 'completed', 'skipped']),
-  estimatedTime: z.string().optional()
+  status: z.enum(['pending', 'in_progress', 'completed', 'skipped', 'failed']),
+  estimatedTime: z.string().optional(),
+  scheduledDate: z.string().optional(),
+  groupLabel: z.string().optional()
 });
 
 const DailyScheduleGroupSchema = z.object({
@@ -385,8 +387,10 @@ export interface DailyTaskItem {
   task: string;
   duration: number;      // 分钟
   priority: 'high' | 'medium' | 'low';
-  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped' | 'failed';
   estimatedTime?: string;
+  scheduledDate?: string;
+  groupLabel?: string;
 }
 
 export interface DailyScheduleGroup {

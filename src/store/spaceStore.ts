@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { useChatStore } from './chatStore';
+import { usePlanStore } from './planStore';
 import type { StudySpace, SpaceStore } from '../types/space';
 
 // 生成唯一ID
@@ -236,6 +237,8 @@ export const useSpaceStore = create<SpaceStore>()(
           }
         });
         useChatStore.getState().deleteSessionsBySpace(spaceId);
+        // 同步清理 plan-storage：删除该空间下的 plans 及其 tasks/blocks/executions
+        usePlanStore.getState().deletePlanBySpace(spaceId);
       },
 
       // 获取已删除的空间列表

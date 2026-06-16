@@ -83,7 +83,7 @@ export interface TaskSnapshot {
   estimatedMinutes: number;
   scheduledDate: string;
   priority: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped' | 'failed';
   dependencies?: string[];
 }
 

@@ -13,6 +13,7 @@ import type { AgentExecutionState } from './chat';
 // ============= Plan =============
 
 export type PlanStatus = 'draft' | 'active' | 'paused' | 'completed' | 'archived';
+export type StudyTaskStatus = 'pending' | 'in_progress' | 'completed' | 'skipped' | 'failed';
 
 export interface Plan {
   id: string;
@@ -43,7 +44,7 @@ export interface StudyTask {
   title: string;
   type: 'study' | 'practice' | 'review';
   priority: 'high' | 'medium' | 'low';
-  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+  status: StudyTaskStatus;
   estimatedMinutes: number;
   /** ISO date string "2026-06-10"，用于分组和重建 scheduleGroups */
   scheduledDate: string;
