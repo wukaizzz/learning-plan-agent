@@ -26,15 +26,26 @@ export function usePlanHydration(spaceId: string | undefined): UsePlanHydrationR
   const plans = usePlanStore(state => state.plans);
   const tasks = usePlanStore(state => state.tasks);
   const blocks = usePlanStore(state => state.blocks);
+  const hydratePlanBySpace = usePlanStore(state => state.hydratePlanBySpace);
   const rolloverOverdueTasks = usePlanStore(state => state.rolloverOverdueTasks);
-
-  useEffect(() => {
-    if (!spaceId) return;
-    rolloverOverdueTasks(spaceId, getLocalDateString());
-  }, [spaceId, rolloverOverdueTasks]);
 
   const isActivelyStreaming =
     currentChatSpaceId === spaceId && isPlanGenerationState(workspaceState);
+
+  useEffect(() => {
+    if (!spaceId || isActivelyStreaming) return;
+
+    let cancelled = false;
+    void hydratePlanBySpace(spaceId).finally(() => {
+      if (!cancelled) {
+        rolloverOverdueTasks(spaceId, getLocalDateString());
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [spaceId, isActivelyStreaming, hydratePlanBySpace, rolloverOverdueTasks]);
 
   const plan = useMemo(() => {
     if (!spaceId) return null;

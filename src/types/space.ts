@@ -67,6 +67,15 @@ export interface StudySpace {
   deletionScheduledAt?: Date;      // 30天彻底删除时间
 }
 
+export type SpaceSyncMutation =
+  | { id: string; kind: 'save_space_snapshot'; spaceId: string; payload: StudySpace }
+  | { id: string; kind: 'permanent_delete_space'; spaceId: string };
+
+export interface SpaceSyncResult {
+  status: 'synced' | 'pending';
+  error: PersistenceSyncIssue | null;
+}
+
 // ============== 学习空间 Store ==============
 
 export interface SpaceStore {
@@ -74,6 +83,9 @@ export interface SpaceStore {
   spaces: StudySpace[];
   currentSpaceId: string | null;
   isLoading: boolean;
+  pendingMutations: SpaceSyncMutation[];
+  hydrationStatus: 'idle' | 'loading' | 'loaded' | 'error';
+  syncErrorBySpace: Record<string, PersistenceSyncIssue | null>;
 
   // Actions
   // 创建新空间
@@ -112,7 +124,11 @@ export interface SpaceStore {
   restoreSpace: (spaceId: string) => void;              // 恢复已删除的空间
   permanentlyDeleteSpace: (spaceId: string) => void;    // 永久删除空间
   getDeletedSpaces: () => StudySpace[];                 // 获取已删除的空间列表
+  hydrateSpaces: () => Promise<void>;
+  flushSpaceSync: (spaceId?: string) => Promise<SpaceSyncResult>;
+  clearSpaceSyncIssue: (spaceId: string) => void;
 
   // 🆕 字段更新相关
   updateSpaceFields: (spaceId: string, fieldsData: Record<string, unknown>) => void;  // 更新特定字段（支持嵌套路径）
 }
+import type { PersistenceSyncIssue } from './persistence';

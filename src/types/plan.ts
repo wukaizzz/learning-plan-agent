@@ -9,6 +9,7 @@
 
 import type { BlockType } from './uiBlocks';
 import type { AgentExecutionState } from './chat';
+import type { PersistenceSyncIssue } from './persistence';
 
 // ============= Plan =============
 
@@ -95,6 +96,24 @@ export interface AgentExecutionRecord extends AgentExecutionState {
   updatedAt: number;
 }
 
+export interface PlanSnapshot {
+  plan: Plan;
+  tasks: StudyTask[];
+  blocks: PlanBlock[];
+}
+
+export type PlanSyncMutation =
+  | { id: string; kind: 'save_snapshot'; spaceId: string; payload: PlanSnapshot }
+  | { id: string; kind: 'activate_plan'; spaceId: string; planId: string }
+  | { id: string; kind: 'update_task_status'; spaceId: string; taskId: string; status: StudyTaskStatus }
+  | { id: string; kind: 'save_execution'; spaceId: string; payload: AgentExecutionRecord }
+  | { id: string; kind: 'delete_space_plans'; spaceId: string };
+
+export interface PlanSyncResult {
+  status: 'synced' | 'pending';
+  error: PersistenceSyncIssue | null;
+}
+
 // ============= Plan Store Schema =============
 
 /** plan-storage 的完整 localStorage schema */
@@ -103,5 +122,6 @@ export interface PlanStorageSchema {
   tasks: StudyTask[];
   blocks: PlanBlock[];
   executions: AgentExecutionRecord[];
+  pendingMutations: PlanSyncMutation[];
   version: number;
 }

@@ -4,8 +4,19 @@ import { immer } from 'zustand/middleware/immer';
 import type { DailyScheduleGroup, DailyTaskItem, UIBlock } from '@/types/uiBlocks';
 import { useSpaceStore } from '@/store/spaceStore';
 import { useChatStore } from '@/store/chatStore';
-import type { AgentExecutionRecord, Plan, PlanBlock, StudyTask } from '@/types/plan';
+import type {
+  AgentExecutionRecord,
+  Plan,
+  PlanBlock,
+  PlanSnapshot,
+  PlanSyncMutation,
+  PlanSyncResult,
+  StudyTask,
+} from '@/types/plan';
 import { extractPlanFromUIBlocks, hydrateUIBlocksFromPlan, normalizeSummaryCardProps, PLAN_BLOCK_TYPES } from '@/utils/planBlockAdapter';
+import * as planPersistenceApi from '@/services/planPersistenceApi';
+import { toPersistenceSyncIssue } from '@/services/persistenceClient';
+import type { PersistenceSyncIssue } from '@/types/persistence';
 
 interface PlanMeta {
   sessionId?: string;
@@ -36,6 +47,9 @@ export interface PlanStore {
   tasks: StudyTask[];
   blocks: PlanBlock[];
   executions: AgentExecutionRecord[];
+  pendingMutations: PlanSyncMutation[];
+  hydrationStatusBySpace: Record<string, 'idle' | 'loading' | 'loaded' | 'error'>;
+  syncErrorBySpace: Record<string, PersistenceSyncIssue | null>;
 
   getLatestPlanBySpace: (spaceId: string) => Plan | null;
   getTasksByPlan: (planId: string) => StudyTask[];
@@ -49,6 +63,9 @@ export interface PlanStore {
   rolloverOverdueTasks: (spaceId: string, today: string) => void;
   saveExecution: (record: AgentExecutionRecord) => void;
   deletePlanBySpace: (spaceId: string) => void;
+  hydratePlanBySpace: (spaceId: string) => Promise<void>;
+  flushPlanSync: (spaceId: string) => Promise<PlanSyncResult>;
+  clearPlanSyncIssue: (spaceId: string) => void;
 }
 
 const getPlanStatusRank = (status: Plan['status']) => {
@@ -207,13 +224,17 @@ const syncRuntimePlanProgress = (
   }
 };
 
-type PersistedPlanState = Pick<PlanStore, 'plans' | 'tasks' | 'blocks' | 'executions'>;
+type PersistedPlanState = Pick<
+  PlanStore,
+  'plans' | 'tasks' | 'blocks' | 'executions' | 'pendingMutations'
+>;
 
 const createEmptyPersistedPlanState = (): PersistedPlanState => ({
   plans: [],
   tasks: [],
   blocks: [],
   executions: [],
+  pendingMutations: [],
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
@@ -228,7 +249,16 @@ const unwrapPersistedPlanState = (persistedState: unknown): unknown => {
   return persistedState;
 };
 
-const migratePlanStorage = (persistedState: unknown): PersistedPlanState => {
+const isPlanSyncMutation = (value: unknown): value is PlanSyncMutation => {
+  if (!isRecord(value)) return false;
+  return typeof value.id === 'string' &&
+    typeof value.spaceId === 'string' &&
+    typeof value.kind === 'string' &&
+    ['save_snapshot', 'activate_plan', 'update_task_status', 'save_execution', 'delete_space_plans']
+      .includes(value.kind);
+};
+
+const migratePlanStorage = (persistedState: unknown, version = 0): PersistedPlanState => {
   const state = unwrapPersistedPlanState(persistedState);
   if (!isRecord(state)) {
     return createEmptyPersistedPlanState();
@@ -248,6 +278,9 @@ const migratePlanStorage = (persistedState: unknown): PersistedPlanState => {
     tasks,
     blocks: Array.isArray(state.blocks) ? state.blocks as PlanBlock[] : [],
     executions: Array.isArray(state.executions) ? state.executions as AgentExecutionRecord[] : [],
+    pendingMutations: version >= 4 && Array.isArray(state.pendingMutations)
+      ? state.pendingMutations.filter(isPlanSyncMutation)
+      : [],
   };
 };
 
@@ -289,6 +322,269 @@ const planStorage: PersistStorage<PersistedPlanState> = {
   },
 };
 
+const syncPromisesBySpace = new Map<string, Promise<PlanSyncResult>>();
+const hydrationPromisesBySpace = new Map<string, Promise<void>>();
+
+const createMutationId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `plan-sync-${crypto.randomUUID()}`;
+  }
+  return `plan-sync-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const cloneSnapshot = (snapshot: PlanSnapshot): PlanSnapshot => (
+  JSON.parse(JSON.stringify(snapshot)) as PlanSnapshot
+);
+
+const buildPlanSnapshot = (
+  state: Pick<PlanStore, 'plans' | 'tasks' | 'blocks'>,
+  planId: string
+): PlanSnapshot | null => {
+  const plan = state.plans.find(item => item.id === planId);
+  if (!plan) return null;
+
+  return cloneSnapshot({
+    plan,
+    tasks: state.tasks.filter(task => task.planId === planId),
+    blocks: state.blocks.filter(block => block.planId === planId),
+  });
+};
+
+const compactMutations = (
+  mutations: PlanSyncMutation[],
+  mutation: PlanSyncMutation
+): PlanSyncMutation[] => {
+  if (mutation.kind === 'delete_space_plans') {
+    return [
+      ...mutations.filter(item => item.spaceId !== mutation.spaceId),
+      mutation,
+    ];
+  }
+
+  if (mutation.kind === 'save_snapshot') {
+    const taskIds = new Set(mutation.payload.tasks.map(task => task.id));
+    const deferredActivations = mutations.filter(item => (
+      item.spaceId === mutation.spaceId && item.kind === 'activate_plan'
+    ));
+    return [
+      ...mutations.filter(item => {
+        if (item.spaceId !== mutation.spaceId) return true;
+        if (item.kind === 'activate_plan') return false;
+        if (item.kind === 'save_snapshot' && item.payload.plan.id === mutation.payload.plan.id) {
+          return false;
+        }
+        if (item.kind === 'update_task_status' && taskIds.has(item.taskId)) {
+          return false;
+        }
+        return true;
+      }),
+      mutation,
+      ...deferredActivations,
+    ];
+  }
+
+  if (mutation.kind === 'activate_plan') {
+    return [
+      ...mutations.filter(item => !(
+        item.spaceId === mutation.spaceId &&
+        item.kind === 'activate_plan' &&
+        item.planId === mutation.planId
+      )),
+      mutation,
+    ];
+  }
+
+  if (mutation.kind === 'update_task_status') {
+    return [
+      ...mutations.filter(item => !(
+        item.spaceId === mutation.spaceId &&
+        item.kind === 'update_task_status' &&
+        item.taskId === mutation.taskId
+      )),
+      mutation,
+    ];
+  }
+
+  return [
+    ...mutations.filter(item => !(
+      item.spaceId === mutation.spaceId &&
+      item.kind === 'save_execution' &&
+      item.payload.executionId === mutation.payload.executionId
+    )),
+    mutation,
+  ];
+};
+
+const isPendingPlanMutation = (mutation: PlanSyncMutation) =>
+  mutation.kind !== 'save_execution';
+
+const isPendingExecutionMutation = (mutation: PlanSyncMutation) =>
+  mutation.kind === 'save_execution';
+
+async function executeMutation(mutation: PlanSyncMutation): Promise<void> {
+  switch (mutation.kind) {
+    case 'save_snapshot':
+      await planPersistenceApi.savePlanSnapshot(mutation.payload);
+      return;
+    case 'activate_plan':
+      await planPersistenceApi.activatePlan(mutation.planId);
+      return;
+    case 'update_task_status':
+      await planPersistenceApi.updateTaskStatus(mutation.taskId, mutation.status);
+      return;
+    case 'save_execution':
+      await planPersistenceApi.saveExecution(mutation.spaceId, mutation.payload);
+      return;
+    case 'delete_space_plans':
+      await planPersistenceApi.deletePlansBySpace(mutation.spaceId);
+      return;
+  }
+}
+
+function runSpaceSync(spaceId: string): Promise<PlanSyncResult> {
+  const existing = syncPromisesBySpace.get(spaceId);
+  if (existing) return existing;
+
+  const syncPromise = (async (): Promise<PlanSyncResult> => {
+    while (true) {
+      const mutation = usePlanStore.getState().pendingMutations
+        .find(item => item.spaceId === spaceId);
+
+      if (!mutation) {
+        usePlanStore.setState(state => ({
+          syncErrorBySpace: {
+            ...state.syncErrorBySpace,
+            [spaceId]: null,
+          },
+        }));
+        return { status: 'synced', error: null };
+      }
+
+      try {
+        await executeMutation(mutation);
+        usePlanStore.setState(state => ({
+          pendingMutations: state.pendingMutations.filter(item => item.id !== mutation.id),
+          syncErrorBySpace: {
+            ...state.syncErrorBySpace,
+            [spaceId]: null,
+          },
+        }));
+      } catch (error) {
+        const issue = toPersistenceSyncIssue(error);
+        usePlanStore.setState(state => ({
+          syncErrorBySpace: {
+            ...state.syncErrorBySpace,
+            [spaceId]: issue,
+          },
+        }));
+        return { status: 'pending', error: issue };
+      }
+    }
+  })().finally(() => {
+    syncPromisesBySpace.delete(spaceId);
+  });
+
+  syncPromisesBySpace.set(spaceId, syncPromise);
+  return syncPromise;
+}
+
+function replacePlanCache(spaceId: string, snapshot: PlanSnapshot | null) {
+  usePlanStore.setState(state => {
+    const localPlanIds = new Set(
+      state.plans
+        .filter(plan => plan.spaceId === spaceId)
+        .map(plan => plan.id)
+    );
+
+    return {
+      plans: [
+        ...state.plans.filter(plan => plan.spaceId !== spaceId),
+        ...(snapshot ? [snapshot.plan] : []),
+      ],
+      tasks: [
+        ...state.tasks.filter(task => !localPlanIds.has(task.planId)),
+        ...(snapshot?.tasks || []),
+      ],
+      blocks: [
+        ...state.blocks.filter(block => !localPlanIds.has(block.planId)),
+        ...(snapshot?.blocks || []),
+      ],
+    };
+  });
+}
+
+function replaceExecutionCache(spaceId: string, execution: AgentExecutionRecord | null) {
+  usePlanStore.setState(state => ({
+    executions: [
+      ...state.executions.filter(item => item.spaceId !== spaceId),
+      ...(execution ? [execution] : []),
+    ],
+  }));
+}
+
+function hydrateSpace(spaceId: string): Promise<void> {
+  const existing = hydrationPromisesBySpace.get(spaceId);
+  if (existing) return existing;
+
+  const hydrationPromise = (async () => {
+    usePlanStore.setState(state => ({
+      hydrationStatusBySpace: {
+        ...state.hydrationStatusBySpace,
+        [spaceId]: 'loading',
+      },
+    }));
+
+    const syncResult = await runSpaceSync(spaceId);
+    const [planResult, executionResult] = await Promise.allSettled([
+      planPersistenceApi.getLatestPlanBySpace(spaceId),
+      planPersistenceApi.getLatestExecutionBySpace(spaceId),
+    ]);
+
+    const pendingMutations = usePlanStore.getState().pendingMutations
+      .filter(mutation => mutation.spaceId === spaceId);
+    const hasPendingPlan = pendingMutations.some(isPendingPlanMutation);
+    const hasPendingExecution = pendingMutations.some(isPendingExecutionMutation);
+    let hasHydrationError = syncResult.status === 'pending';
+
+    if (planResult.status === 'fulfilled') {
+      if (!hasPendingPlan) {
+        replacePlanCache(spaceId, planResult.value);
+      }
+    } else {
+      hasHydrationError = true;
+      console.error('[planStore] Failed to hydrate plan', planResult.reason);
+    }
+
+    if (executionResult.status === 'fulfilled') {
+      if (!hasPendingExecution) {
+        replaceExecutionCache(spaceId, executionResult.value);
+      }
+    } else {
+      hasHydrationError = true;
+      console.error('[planStore] Failed to hydrate execution', executionResult.reason);
+    }
+
+    usePlanStore.setState(state => ({
+      hydrationStatusBySpace: {
+        ...state.hydrationStatusBySpace,
+        [spaceId]: hasHydrationError ? 'error' : 'loaded',
+      },
+    }));
+  })().finally(() => {
+    hydrationPromisesBySpace.delete(spaceId);
+  });
+
+  hydrationPromisesBySpace.set(spaceId, hydrationPromise);
+  return hydrationPromise;
+}
+
+function enqueueMutation(mutation: PlanSyncMutation) {
+  usePlanStore.setState(state => ({
+    pendingMutations: compactMutations(state.pendingMutations, mutation),
+  }));
+  void runSpaceSync(mutation.spaceId);
+}
+
 export const usePlanStore = create<PlanStore>()(
   persist(
     immer((set, get) => ({
@@ -296,6 +592,9 @@ export const usePlanStore = create<PlanStore>()(
       tasks: [],
       blocks: [],
       executions: [],
+      pendingMutations: [],
+      hydrationStatusBySpace: {},
+      syncErrorBySpace: {},
 
       getLatestPlanBySpace: (spaceId: string) => {
         const { plans } = get();
@@ -333,6 +632,7 @@ export const usePlanStore = create<PlanStore>()(
 
         const extracted = extractPlanFromUIBlocks(spaceId, planBlocks, meta);
         if (!extracted) return;
+        let persistedPlanId = '';
 
         set(state => {
           const existingDraft = state.plans.find(
@@ -340,6 +640,7 @@ export const usePlanStore = create<PlanStore>()(
           );
 
           if (existingDraft) {
+            persistedPlanId = existingDraft.id;
             state.tasks = state.tasks.filter(task => task.planId !== existingDraft.id);
             state.blocks = state.blocks.filter(block => block.planId !== existingDraft.id);
 
@@ -353,6 +654,7 @@ export const usePlanStore = create<PlanStore>()(
             return;
           }
 
+          persistedPlanId = extracted.plan.id;
           const oldActive = state.plans.find(
             plan => plan.spaceId === spaceId && plan.status === 'active'
           );
@@ -365,14 +667,26 @@ export const usePlanStore = create<PlanStore>()(
           state.tasks.push(...extracted.tasks);
           state.blocks.push(...extracted.blocks);
         });
+
+        const snapshot = buildPlanSnapshot(get(), persistedPlanId);
+        if (snapshot) {
+          enqueueMutation({
+            id: createMutationId(),
+            kind: 'save_snapshot',
+            spaceId,
+            payload: snapshot,
+          });
+        }
       },
 
       activatePlan: (spaceId: string) => {
+        let planId = '';
         set(state => {
           const draft = state.plans.find(
             plan => plan.spaceId === spaceId && plan.status === 'draft'
           );
           if (draft) {
+            planId = draft.id;
             draft.status = 'active';
             draft.updatedAt = Date.now();
             return;
@@ -382,9 +696,19 @@ export const usePlanStore = create<PlanStore>()(
             plan => plan.spaceId === spaceId && plan.status === 'active'
           );
           if (active) {
+            planId = active.id;
             active.updatedAt = Date.now();
           }
         });
+
+        if (planId) {
+          enqueueMutation({
+            id: createMutationId(),
+            kind: 'activate_plan',
+            spaceId,
+            planId,
+          });
+        }
       },
 
       updateTaskStatus: (taskId: string, status: StudyTask['status']) => {
@@ -438,10 +762,18 @@ export const usePlanStore = create<PlanStore>()(
         }
 
         syncRuntimePlanProgress(planSpaceId, progressSnapshot, { [taskId]: status });
+        enqueueMutation({
+          id: createMutationId(),
+          kind: 'update_task_status',
+          spaceId: planSpaceId,
+          taskId,
+          status,
+        });
       },
 
       rolloverOverdueTasks: (spaceId: string, today: string) => {
         let planSpaceId = '';
+        let planId = '';
         let progressSnapshot: ReturnType<typeof calculatePlanProgress> | null = null;
         const statusById: TaskStatusById = {};
 
@@ -472,6 +804,7 @@ export const usePlanStore = create<PlanStore>()(
 
           plan.updatedAt = Date.now();
           planSpaceId = plan.spaceId;
+          planId = plan.id;
           progressSnapshot = calculatePlanProgress(planTasks);
 
           for (const block of state.blocks.filter(item => item.planId === plan.id)) {
@@ -498,6 +831,15 @@ export const usePlanStore = create<PlanStore>()(
         }
 
         syncRuntimePlanProgress(planSpaceId, progressSnapshot, statusById);
+        const snapshot = buildPlanSnapshot(get(), planId);
+        if (snapshot) {
+          enqueueMutation({
+            id: createMutationId(),
+            kind: 'save_snapshot',
+            spaceId: planSpaceId,
+            payload: snapshot,
+          });
+        }
       },
 
       saveExecution: (record: AgentExecutionRecord) => {
@@ -508,6 +850,12 @@ export const usePlanStore = create<PlanStore>()(
           } else {
             state.executions.push(record);
           }
+        });
+        enqueueMutation({
+          id: createMutationId(),
+          kind: 'save_execution',
+          spaceId: record.spaceId,
+          payload: JSON.parse(JSON.stringify(record)) as AgentExecutionRecord,
         });
       },
 
@@ -522,19 +870,38 @@ export const usePlanStore = create<PlanStore>()(
           state.blocks = state.blocks.filter(block => !planIds.includes(block.planId));
           state.executions = state.executions.filter(execution => execution.spaceId !== spaceId);
         });
+        enqueueMutation({
+          id: createMutationId(),
+          kind: 'delete_space_plans',
+          spaceId,
+        });
+      },
+
+      hydratePlanBySpace: (spaceId: string) => hydrateSpace(spaceId),
+
+      flushPlanSync: (spaceId: string) => runSpaceSync(spaceId),
+
+      clearPlanSyncIssue: (spaceId: string) => {
+        set(state => {
+          state.syncErrorBySpace[spaceId] = null;
+        });
       },
     })),
     {
       name: 'plan-storage',
-      version: 2,
+      version: 4,
       storage: planStorage,
-      migrate: (persistedState) => migratePlanStorage(persistedState),
+      migrate: (persistedState, version) => migratePlanStorage(persistedState, version),
       partialize: (state) => ({
         plans: state.plans,
         tasks: state.tasks,
         blocks: state.blocks,
         executions: state.executions,
+        pendingMutations: state.pendingMutations,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+      },
     }
   )
 );

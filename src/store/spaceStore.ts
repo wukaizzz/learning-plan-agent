@@ -3,7 +3,17 @@ import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { useChatStore } from './chatStore';
 import { usePlanStore } from './planStore';
-import type { StudySpace, SpaceStore } from '../types/space';
+import type {
+  SpaceStore,
+  SpaceSyncMutation,
+  SpaceSyncResult,
+  StudySpace,
+} from '../types/space';
+import * as persistenceApi from '@/services/spaceChatPersistenceApi';
+import {
+  isPersistenceApiError,
+  toPersistenceSyncIssue,
+} from '@/services/persistenceClient';
 
 // 生成唯一ID
 const generateSpaceId = () => `space_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
@@ -23,6 +33,190 @@ const DEFAULT_COLORS = [
 // 获取随机颜色
 const getRandomColor = () => DEFAULT_COLORS[Math.floor(Math.random() * DEFAULT_COLORS.length)];
 
+const spaceSyncPromises = new Map<string, Promise<SpaceSyncResult>>();
+const spaceSyncTimers = new Map<string, number>();
+let spaceHydrationPromise: Promise<void> | null = null;
+
+const createMutationId = () => (
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? `space-sync-${crypto.randomUUID()}`
+    : `space-sync-${Date.now()}-${Math.random().toString(36).slice(2)}`
+);
+
+const normalizeDate = (value: Date | string | number | undefined, fallback = Date.now()) => {
+  const date = value instanceof Date ? value : new Date(value ?? fallback);
+  return Number.isNaN(date.getTime()) ? new Date(fallback) : date;
+};
+
+const normalizeSpaceDates = (space: StudySpace): StudySpace => ({
+  ...space,
+  goal: {
+    ...space.goal,
+    examDate: normalizeDate(space.goal?.examDate),
+  },
+  schedule: {
+    ...space.schedule,
+    startDate: normalizeDate(space.schedule?.startDate),
+  },
+  createdAt: normalizeDate(space.createdAt),
+  updatedAt: normalizeDate(space.updatedAt),
+  lastActiveAt: normalizeDate(space.lastActiveAt),
+  deletedAt: space.deletedAt ? normalizeDate(space.deletedAt) : undefined,
+  deletionScheduledAt: space.deletionScheduledAt
+    ? normalizeDate(space.deletionScheduledAt)
+    : undefined,
+});
+
+const compactSpaceMutations = (
+  mutations: SpaceSyncMutation[],
+  mutation: SpaceSyncMutation
+) => {
+  if (mutation.kind === 'permanent_delete_space') {
+    return [
+      ...mutations.filter(item => item.spaceId !== mutation.spaceId),
+      mutation,
+    ];
+  }
+  return [
+    ...mutations.filter(item => item.spaceId !== mutation.spaceId),
+    mutation,
+  ];
+};
+
+async function executeSpaceMutation(mutation: SpaceSyncMutation) {
+  if (mutation.kind === 'save_space_snapshot') {
+    await persistenceApi.saveSpace(mutation.payload);
+    return;
+  }
+  await persistenceApi.permanentlyDeleteSpace(mutation.spaceId);
+}
+
+function applyRemoteSpaceConflict(spaceId: string, current: persistenceApi.RemoteSpace) {
+  const remoteSpace = persistenceApi.deserializeSpace(current);
+  useSpaceStore.setState(state => {
+    const spaces = state.spaces.some(space => space.id === spaceId)
+      ? state.spaces.map(space => space.id === spaceId ? remoteSpace : space)
+      : [...state.spaces, remoteSpace];
+    const currentSpaceId = state.currentSpaceId === spaceId && remoteSpace.isDeleted
+      ? spaces.find(space => !space.isDeleted)?.id ?? null
+      : state.currentSpaceId;
+    return { spaces, currentSpaceId };
+  });
+}
+
+function runSpaceSync(spaceId: string): Promise<SpaceSyncResult> {
+  const existing = spaceSyncPromises.get(spaceId);
+  if (existing) return existing;
+
+  const promise = (async (): Promise<SpaceSyncResult> => {
+    while (true) {
+      const mutation = useSpaceStore.getState().pendingMutations
+        .find(item => item.spaceId === spaceId);
+      if (!mutation) {
+        useSpaceStore.setState(state => ({
+          syncErrorBySpace: { ...state.syncErrorBySpace, [spaceId]: null },
+        }));
+        void usePlanStore.getState().flushPlanSync(spaceId);
+        void useChatStore.getState().flushChatSync();
+        return { status: 'synced', error: null };
+      }
+      try {
+        await executeSpaceMutation(mutation);
+        useSpaceStore.setState(state => ({
+          pendingMutations: state.pendingMutations.filter(item => item.id !== mutation.id),
+          syncErrorBySpace: { ...state.syncErrorBySpace, [spaceId]: null },
+        }));
+      } catch (error) {
+        const issue = toPersistenceSyncIssue(error);
+        if (
+          isPersistenceApiError(error) &&
+          error.code === 'STALE_WRITE_CONFLICT'
+        ) {
+          const mutationIsCurrent = useSpaceStore.getState().pendingMutations
+            .some(item => item.id === mutation.id);
+          if (!mutationIsCurrent) {
+            continue;
+          }
+          const current = (error.details as { current?: persistenceApi.RemoteSpace } | undefined)
+            ?.current;
+          if (current) applyRemoteSpaceConflict(spaceId, current);
+          useSpaceStore.setState(state => ({
+            pendingMutations: state.pendingMutations.filter(item => item.id !== mutation.id),
+            syncErrorBySpace: { ...state.syncErrorBySpace, [spaceId]: issue },
+          }));
+          return { status: 'synced', error: issue };
+        }
+        useSpaceStore.setState(state => ({
+          syncErrorBySpace: { ...state.syncErrorBySpace, [spaceId]: issue },
+        }));
+        return { status: 'pending', error: issue };
+      }
+    }
+  })().finally(() => {
+    spaceSyncPromises.delete(spaceId);
+  });
+
+  spaceSyncPromises.set(spaceId, promise);
+  return promise;
+}
+
+function enqueueSpaceMutation(mutation: SpaceSyncMutation, immediate = false) {
+  useSpaceStore.setState(state => ({
+    pendingMutations: compactSpaceMutations(state.pendingMutations, mutation),
+  }));
+  const existingTimer = spaceSyncTimers.get(mutation.spaceId);
+  if (existingTimer) window.clearTimeout(existingTimer);
+  spaceSyncTimers.delete(mutation.spaceId);
+
+  if (immediate || mutation.kind === 'permanent_delete_space') {
+    void runSpaceSync(mutation.spaceId);
+    return;
+  }
+
+  const timer = window.setTimeout(() => {
+    spaceSyncTimers.delete(mutation.spaceId);
+    void runSpaceSync(mutation.spaceId);
+  }, 500);
+  spaceSyncTimers.set(mutation.spaceId, timer);
+}
+
+async function hydrateSpaces() {
+  if (spaceHydrationPromise) return spaceHydrationPromise;
+  spaceHydrationPromise = (async () => {
+    useSpaceStore.setState({ hydrationStatus: 'loading' });
+    const spaceIds = new Set(
+      useSpaceStore.getState().pendingMutations.map(mutation => mutation.spaceId)
+    );
+    await Promise.all(Array.from(spaceIds, spaceId => runSpaceSync(spaceId)));
+    try {
+      const remoteSpaces = await persistenceApi.listSpaces(true);
+      const state = useSpaceStore.getState();
+      const pendingIds = new Set(state.pendingMutations.map(item => item.spaceId));
+      const pendingLocalSpaces = state.spaces.filter(space => pendingIds.has(space.id));
+      const remoteIds = new Set(remoteSpaces.map(space => space.id));
+      const nextSpaces = [
+        ...remoteSpaces.filter(space => !pendingIds.has(space.id)),
+        ...pendingLocalSpaces.filter(space => !remoteIds.has(space.id) || pendingIds.has(space.id)),
+      ];
+      const currentSpaceId = state.currentSpaceId &&
+        nextSpaces.some(space => space.id === state.currentSpaceId)
+        ? state.currentSpaceId
+        : nextSpaces.find(space => !space.isDeleted)?.id ?? null;
+      useSpaceStore.setState({
+        spaces: nextSpaces,
+        currentSpaceId,
+        hydrationStatus: 'loaded',
+      });
+    } catch (error) {
+      useSpaceStore.setState({ hydrationStatus: 'error' });
+      throw error;
+    }
+  })().finally(() => {
+    spaceHydrationPromise = null;
+  });
+  return spaceHydrationPromise;
+}
+
 export const useSpaceStore = create<SpaceStore>()(
   persist(
     immer((set, get) => ({
@@ -30,6 +224,9 @@ export const useSpaceStore = create<SpaceStore>()(
       spaces: [],
       currentSpaceId: null,
       isLoading: false,
+      pendingMutations: [],
+      hydrationStatus: 'idle',
+      syncErrorBySpace: {},
 
       // 创建新学习空间
       createSpace: (config) => {
@@ -58,6 +255,12 @@ export const useSpaceStore = create<SpaceStore>()(
           state.spaces.push(newSpace);
           state.currentSpaceId = newSpace.id;
         })
+        enqueueSpaceMutation({
+          id: createMutationId(),
+          kind: 'save_space_snapshot',
+          spaceId: newSpace.id,
+          payload: newSpace,
+        }, true);
         return newSpace.id;
       },
 
@@ -67,9 +270,20 @@ export const useSpaceStore = create<SpaceStore>()(
           const space = state.spaces.find(s => s.id === spaceId);
           if (space) {
             state.currentSpaceId = spaceId;
-            space.lastActiveAt = new Date(); // 更新最后活跃时间
+            const now = new Date();
+            space.lastActiveAt = now;
+            space.updatedAt = now;
           }
         });
+        const space = get().spaces.find(item => item.id === spaceId);
+        if (space) {
+          enqueueSpaceMutation({
+            id: createMutationId(),
+            kind: 'save_space_snapshot',
+            spaceId,
+            payload: space,
+          });
+        }
       },
       // 更新空间信息
       updateSpace: (spaceId, updates) => {
@@ -80,23 +294,19 @@ export const useSpaceStore = create<SpaceStore>()(
             state.spaces[spaceIndex].updatedAt = new Date();
           }
         });
+        const space = get().spaces.find(item => item.id === spaceId);
+        if (space) {
+          enqueueSpaceMutation({
+            id: createMutationId(),
+            kind: 'save_space_snapshot',
+            spaceId,
+            payload: space,
+          });
+        }
       },
 
       // 删除空间
-      deleteSpace: (spaceId) => {
-        set((state) => {
-          state.spaces = state.spaces.filter(s => s.id !== spaceId);
-
-          // 如果删除的是当前空间，切换到其他空间或设为null
-          if (state.currentSpaceId === spaceId) {
-            if (state.spaces.length > 0) {
-              state.currentSpaceId = state.spaces[0].id;
-            } else {
-              state.currentSpaceId = null;  
-            }
-          }
-        });
-      },
+      deleteSpace: (spaceId) => get().permanentlyDeleteSpace(spaceId),
 
       // 获取当前空间
       getCurrentSpace: () => {
@@ -124,6 +334,15 @@ export const useSpaceStore = create<SpaceStore>()(
             space.updatedAt = new Date();
           }
         });
+        const space = get().spaces.find(item => item.id === spaceId);
+        if (space) {
+          enqueueSpaceMutation({
+            id: createMutationId(),
+            kind: 'save_space_snapshot',
+            spaceId,
+            payload: space,
+          });
+        }
       },
 
       // 搜索空间
@@ -156,6 +375,15 @@ export const useSpaceStore = create<SpaceStore>()(
             }
           }
         });
+        const space = get().spaces.find(item => item.id === spaceId);
+        if (space) {
+          enqueueSpaceMutation({
+            id: createMutationId(),
+            kind: 'save_space_snapshot',
+            spaceId,
+            payload: space,
+          }, true);
+        }
       },
 
       // 恢复已删除的学习空间
@@ -170,6 +398,15 @@ export const useSpaceStore = create<SpaceStore>()(
             space.lastActiveAt = new Date(); // 更新活跃时间
           }
         });
+        const space = get().spaces.find(item => item.id === spaceId);
+        if (space) {
+          enqueueSpaceMutation({
+            id: createMutationId(),
+            kind: 'save_space_snapshot',
+            spaceId,
+            payload: space,
+          }, true);
+        }
       },
 
       // 🆕 更新空间的特定字段（支持嵌套路径，如 "goal.examDate"）
@@ -223,6 +460,15 @@ export const useSpaceStore = create<SpaceStore>()(
           space.updatedAt = new Date();
           space.lastActiveAt = new Date();
         });
+        const space = get().spaces.find(item => item.id === spaceId);
+        if (space) {
+          enqueueSpaceMutation({
+            id: createMutationId(),
+            kind: 'save_space_snapshot',
+            spaceId,
+            payload: space,
+          });
+        }
       },
 
       // 永久删除学习空间
@@ -237,8 +483,25 @@ export const useSpaceStore = create<SpaceStore>()(
           }
         });
         useChatStore.getState().deleteSessionsBySpace(spaceId);
-        // 同步清理 plan-storage：删除该空间下的 plans 及其 tasks/blocks/executions
-        usePlanStore.getState().deletePlanBySpace(spaceId);
+        usePlanStore.setState(state => {
+          const planIds = state.plans
+            .filter(plan => plan.spaceId === spaceId)
+            .map(plan => plan.id);
+          return {
+            plans: state.plans.filter(plan => plan.spaceId !== spaceId),
+            tasks: state.tasks.filter(task => !planIds.includes(task.planId)),
+            blocks: state.blocks.filter(block => !planIds.includes(block.planId)),
+            executions: state.executions.filter(execution => execution.spaceId !== spaceId),
+            pendingMutations: state.pendingMutations.filter(
+              mutation => mutation.spaceId !== spaceId
+            ),
+          };
+        });
+        enqueueSpaceMutation({
+          id: createMutationId(),
+          kind: 'permanent_delete_space',
+          spaceId,
+        });
       },
 
       // 获取已删除的空间列表
@@ -252,14 +515,57 @@ export const useSpaceStore = create<SpaceStore>()(
             return bTime - aTime; // 按删除时间倒序
           });
       },
+
+      hydrateSpaces,
+
+      flushSpaceSync: async (spaceId?: string) => {
+        const ids = spaceId
+          ? [spaceId]
+          : Array.from(new Set(get().pendingMutations.map(item => item.spaceId)));
+        ids.forEach(id => {
+          const timer = spaceSyncTimers.get(id);
+          if (timer) window.clearTimeout(timer);
+          spaceSyncTimers.delete(id);
+        });
+        const results = await Promise.all(ids.map(runSpaceSync));
+        const pending = results.find(result => result.status === 'pending');
+        return pending || { status: 'synced', error: null };
+      },
+
+      clearSpaceSyncIssue: (spaceId: string) => {
+        set(state => {
+          state.syncErrorBySpace[spaceId] = null;
+        });
+      },
     })),
     {
       name: 'studySpace-storage',
+      version: 2,
+      migrate: (persistedState: unknown, version?: number) => {
+        const state = persistedState && typeof persistedState === 'object'
+          ? persistedState as Partial<SpaceStore>
+          : {};
+        return {
+          ...state,
+          spaces: Array.isArray(state.spaces)
+            ? state.spaces.map(space => normalizeSpaceDates(space))
+            : [],
+          pendingMutations: version !== undefined && version >= 2 &&
+            Array.isArray(state.pendingMutations)
+            ? state.pendingMutations
+            : [],
+        };
+      },
       partialize: (state) => ({
         spaces: state.spaces,
         currentSpaceId: state.currentSpaceId,
+        pendingMutations: state.pendingMutations,
         // 不持久化 isLoading
       }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        state.spaces = state.spaces.map(normalizeSpaceDates);
+      },
     }
   )
 );

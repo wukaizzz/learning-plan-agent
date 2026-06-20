@@ -337,7 +337,24 @@ export function useStream() {
       // 移除指定block（需要在chatStore中实现removeUIBlock方法）
       console.log('Remove block:', event.blockId);
     }
-  }, [addAssistantMessage, addUIBlock, addUIBlockToLastAssistantMessage]);
+  }, [addAssistantMessage, addUIBlock, addUIBlockToLastAssistantMessage, scheduleDraftSave]);
+
+  const persistAgentExecution = useCallback((
+    messageId: string,
+    execution: AgentExecutionState
+  ) => {
+    const chatState = useChatStore.getState();
+    const spaceId = chatState.currentSpaceId;
+    if (!spaceId) return;
+
+    usePlanStore.getState().saveExecution({
+      ...execution,
+      spaceId,
+      sessionId: chatState.currentSessionId || '',
+      messageId,
+      updatedAt: Date.now(),
+    });
+  }, []);
 
   // Agent Execution handlers
   const handleAgentExecutionStart = useCallback((chunk: { executionId: string; messageId?: string; title: string; steps: Array<{ stepId: string; title: string }> }) => {
@@ -356,7 +373,8 @@ export function useStream() {
       status: 'running'
     };
     useChatStore.getState().updateAgentExecution(messageId, execution);
-  }, []);
+    persistAgentExecution(messageId, execution);
+  }, [persistAgentExecution]);
 
   const handleAgentStepUpdate = useCallback((chunk: { executionId: string; messageId?: string; stepId: string; status: string; title?: string; summary?: string; description?: string; metadata?: Record<string, unknown> }) => {
     const messageId = (chunk.messageId || currentMessageIdRef.current) ?? undefined;
@@ -383,6 +401,7 @@ export function useStream() {
         status: 'running'
       };
       store.updateAgentExecution(messageId, execution);
+      persistAgentExecution(messageId, execution);
       return;
     }
     const prev = message.agent_execution;
@@ -398,8 +417,10 @@ export function useStream() {
     const newSteps = stepIndex >= 0
       ? prev.steps.map((s, i) => i === stepIndex ? updatedStep : s)
       : [...prev.steps, updatedStep];
-    store.updateAgentExecution(messageId, { ...prev, steps: newSteps });
-  }, []);
+    const execution = { ...prev, steps: newSteps };
+    store.updateAgentExecution(messageId, execution);
+    persistAgentExecution(messageId, execution);
+  }, [persistAgentExecution]);
 
   const handleAgentExecutionFinish = useCallback((chunk: { executionId: string; messageId?: string; status: string; summary?: string }) => {
     const messageId = (chunk.messageId || currentMessageIdRef.current) ?? undefined;
@@ -430,13 +451,15 @@ export function useStream() {
       return step;
     });
 
-    store.updateAgentExecution(messageId, {
+    const execution = {
       ...prev,
       steps: convergedSteps,
       status: chunk.status as AgentExecutionState['status'],
       summary: chunk.summary
-    });
-  }, []);
+    };
+    store.updateAgentExecution(messageId, execution);
+    persistAgentExecution(messageId, execution);
+  }, [persistAgentExecution]);
 
   const ensureAssistantMessage = useCallback(() => {
     if (hasStartedStreaming.current) {

@@ -1,9 +1,22 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { ChatStore, Message, ChatSession, WorkspaceState, UIBlock } from '@/types'
+import type {
+  ChatStore,
+  ChatSyncMutation,
+  ChatSyncResult,
+  Message,
+  ChatSession,
+  WorkspaceState,
+  UIBlock,
+} from '@/types'
 import { extractPlanFromUIBlocks, normalizePlanUIBlock, PLAN_BLOCK_TYPES } from '@/utils/planBlockAdapter';
 import { traceAgent } from '@/shared/debug/agentTrace';
+import * as persistenceApi from '@/services/spaceChatPersistenceApi';
+import {
+  isPersistenceApiError,
+  toPersistenceSyncIssue,
+} from '@/services/persistenceClient';
 const generateId = () => `session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
 const messageHasCollectionForm = (message: Message) =>
@@ -75,6 +88,220 @@ const normalizeMessageRuntimeFields = (message: Message) => {
   message.thinkingActive = false;
 };
 
+const chatSyncPromises = new Map<string, Promise<ChatSyncResult>>();
+const chatSyncTimers = new Map<string, ReturnType<typeof setTimeout>>();
+let chatHydrationPromise: Promise<void> | null = null;
+let suppressSessionObserver = false;
+let sessionFingerprints = new Map<string, string>();
+let observedSessions = new Map<string, ChatSession>();
+
+const createSyncMutationId = () => (
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? `chat-sync-${crypto.randomUUID()}`
+    : `chat-sync-${Date.now()}-${Math.random().toString(36).slice(2)}`
+);
+
+const sessionFingerprint = (session: ChatSession) => JSON.stringify({
+  id: session.id,
+  spaceId: session.spaceId,
+  title: session.title,
+  createdAt: session.createdAt,
+  messages: session.messages.map(persistenceApi.sanitizeMessage),
+});
+
+const compactChatMutations = (
+  mutations: ChatSyncMutation[],
+  mutation: ChatSyncMutation
+) => [
+  ...mutations.filter(item => item.sessionId !== mutation.sessionId),
+  mutation,
+];
+
+async function executeChatMutation(mutation: ChatSyncMutation) {
+  if (mutation.kind === 'save_session_snapshot') {
+    await persistenceApi.saveSession(mutation.payload);
+    return;
+  }
+  await persistenceApi.deleteSession(mutation.sessionId);
+}
+
+function applyRemoteSessionConflict(
+  sessionId: string,
+  current: persistenceApi.RemoteSession
+) {
+  const remote = persistenceApi.deserializeSession(current);
+  const state = useChatStore.getState();
+  const local = state.sessions.find(session => session.id === sessionId);
+  const merged: ChatSession = {
+    ...remote,
+    draftMessage: local?.draftMessage || '',
+    scrollPosition: local?.scrollPosition || 0,
+  };
+
+  suppressSessionObserver = true;
+  try {
+    useChatStore.setState(currentState => {
+      const sessions = currentState.sessions.some(session => session.id === sessionId)
+        ? currentState.sessions.map(session => session.id === sessionId ? merged : session)
+        : [merged, ...currentState.sessions];
+      return {
+        sessions,
+        ...(currentState.currentSessionId === sessionId
+          ? {
+              messages: merged.messages,
+              currentSpaceId: merged.spaceId,
+            }
+          : {}),
+      };
+    });
+    refreshSessionObserver(useChatStore.getState().sessions);
+  } finally {
+    suppressSessionObserver = false;
+  }
+}
+
+function runChatSync(sessionId: string): Promise<ChatSyncResult> {
+  const existing = chatSyncPromises.get(sessionId);
+  if (existing) return existing;
+
+  const promise = (async (): Promise<ChatSyncResult> => {
+    while (true) {
+      const mutation = useChatStore.getState().pendingMutations
+        .find(item => item.sessionId === sessionId);
+      if (!mutation) {
+        useChatStore.setState(state => ({
+          syncErrorBySession: {
+            ...state.syncErrorBySession,
+            [sessionId]: null,
+          },
+        }));
+        return { status: 'synced', error: null };
+      }
+      try {
+        await executeChatMutation(mutation);
+        useChatStore.setState(state => ({
+          pendingMutations: state.pendingMutations.filter(item => item.id !== mutation.id),
+          syncErrorBySession: {
+            ...state.syncErrorBySession,
+            [sessionId]: null,
+          },
+        }));
+      } catch (error) {
+        const issue = toPersistenceSyncIssue(error);
+        if (
+          isPersistenceApiError(error) &&
+          error.code === 'STALE_WRITE_CONFLICT'
+        ) {
+          const mutationIsCurrent = useChatStore.getState().pendingMutations
+            .some(item => item.id === mutation.id);
+          if (!mutationIsCurrent) {
+            continue;
+          }
+          const current = (error.details as { current?: persistenceApi.RemoteSession } | undefined)
+            ?.current;
+          if (current) applyRemoteSessionConflict(sessionId, current);
+          useChatStore.setState(state => ({
+            pendingMutations: state.pendingMutations.filter(item => item.id !== mutation.id),
+            syncErrorBySession: {
+              ...state.syncErrorBySession,
+              [sessionId]: issue,
+            },
+          }));
+          return { status: 'synced', error: issue };
+        }
+        useChatStore.setState(state => ({
+          syncErrorBySession: {
+            ...state.syncErrorBySession,
+            [sessionId]: issue,
+          },
+        }));
+        return { status: 'pending', error: issue };
+      }
+    }
+  })().finally(() => {
+    chatSyncPromises.delete(sessionId);
+  });
+
+  chatSyncPromises.set(sessionId, promise);
+  return promise;
+}
+
+function enqueueChatMutation(mutation: ChatSyncMutation) {
+  useChatStore.setState(state => ({
+    pendingMutations: compactChatMutations(state.pendingMutations, mutation),
+  }));
+  const existingTimer = chatSyncTimers.get(mutation.sessionId);
+  if (existingTimer) clearTimeout(existingTimer);
+  if (mutation.kind === 'delete_session') {
+    void runChatSync(mutation.sessionId);
+    return;
+  }
+  const timer = setTimeout(() => {
+    chatSyncTimers.delete(mutation.sessionId);
+    void runChatSync(mutation.sessionId);
+  }, 500);
+  chatSyncTimers.set(mutation.sessionId, timer);
+}
+
+function refreshSessionObserver(sessions: ChatSession[]) {
+  sessionFingerprints = new Map(
+    sessions.map(session => [session.id, sessionFingerprint(session)])
+  );
+  observedSessions = new Map(sessions.map(session => [session.id, session]));
+}
+
+async function hydrateChatSessions() {
+  if (chatHydrationPromise) return chatHydrationPromise;
+  chatHydrationPromise = (async () => {
+    useChatStore.setState({ hydrationStatus: 'loading' });
+    const pendingIdsBefore = new Set(
+      useChatStore.getState().pendingMutations.map(item => item.sessionId)
+    );
+    await Promise.all(Array.from(pendingIdsBefore, runChatSync));
+    try {
+      const remoteSessions = await persistenceApi.listSessions();
+      const state = useChatStore.getState();
+      const pendingIds = new Set(state.pendingMutations.map(item => item.sessionId));
+      const localById = new Map(state.sessions.map(session => [session.id, session]));
+      const mergedRemote = remoteSessions
+        .filter(session => !pendingIds.has(session.id))
+        .map(session => {
+          const local = localById.get(session.id);
+          return {
+            ...session,
+            draftMessage: local?.draftMessage || '',
+            scrollPosition: local?.scrollPosition || 0,
+          };
+        });
+      const pendingLocal = state.sessions.filter(session => pendingIds.has(session.id));
+      const sessions = [...mergedRemote, ...pendingLocal]
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+      const currentSessionId = state.currentSessionId &&
+        sessions.some(session => session.id === state.currentSessionId)
+        ? state.currentSessionId
+        : sessions[0]?.id ?? null;
+      const currentSession = sessions.find(session => session.id === currentSessionId);
+      suppressSessionObserver = true;
+      useChatStore.setState({
+        sessions,
+        currentSessionId,
+        currentSpaceId: currentSession?.spaceId ?? state.currentSpaceId,
+        messages: currentSession?.messages ?? [],
+        hydrationStatus: 'loaded',
+      });
+      refreshSessionObserver(sessions);
+      suppressSessionObserver = false;
+    } catch (error) {
+      useChatStore.setState({ hydrationStatus: 'error' });
+      throw error;
+    }
+  })().finally(() => {
+    suppressSessionObserver = false;
+    chatHydrationPromise = null;
+  });
+  return chatHydrationPromise;
+}
+
 /**
  * v3 → v4 迁移：从旧 session messages 的 workflow_events 提取计划数据
  * 写入 plan-storage（localStorage），然后瘦身 messages
@@ -84,7 +311,11 @@ const normalizeMessageRuntimeFields = (message: Message) => {
 const migrateV3ToV4PlanData = (sessions: unknown[]) => {
   try {
     // 按 spaceId 分组，每组取最新含计划 blocks 的 message
-    const spacePlanBlocks = new Map<string, { blocks: any[]; sessionId?: string; messageId?: string }>();
+    const spacePlanBlocks = new Map<string, {
+      blocks: UIBlock[];
+      sessionId?: string;
+      messageId?: string;
+    }>();
 
     for (const session of sessions) {
       const s = session as Record<string, unknown>;
@@ -98,15 +329,15 @@ const migrateV3ToV4PlanData = (sessions: unknown[]) => {
         if (msg.role !== 'assistant') continue;
 
         const events = Array.isArray(msg.workflow_events) ? msg.workflow_events : [];
-        const planBlocks: any[] = [];
+        const planBlocks: UIBlock[] = [];
 
         for (const event of events) {
           const e = event as Record<string, unknown>;
           if (e.type === 'ui_block_update' && (e.action === 'add' || e.action === 'update') && e.block) {
-            const block = e.block as Record<string, unknown>;
-            if (PLAN_BLOCK_TYPES.has(block.type as string)) {
+            const block = e.block as UIBlock;
+            if (PLAN_BLOCK_TYPES.has(block.type)) {
               // 去重：同 id 的 block 只保留最新
-              const existingIdx = planBlocks.findIndex((b: any) => b.id === block.id);
+              const existingIdx = planBlocks.findIndex(candidate => candidate.id === block.id);
               if (existingIdx >= 0) {
                 planBlocks[existingIdx] = block;
               } else {
@@ -134,7 +365,19 @@ const migrateV3ToV4PlanData = (sessions: unknown[]) => {
     if (spacePlanBlocks.size > 0) {
       try {
         const planStorage = localStorage.getItem('plan-storage');
-        const existing = planStorage ? JSON.parse(planStorage) : { plans: [], tasks: [], blocks: [], executions: [], version: 1 };
+        const existing = (planStorage ? JSON.parse(planStorage) : {
+          plans: [],
+          tasks: [],
+          blocks: [],
+          executions: [],
+          version: 1,
+        }) as {
+          plans: Array<{ spaceId?: string }>;
+          tasks: unknown[];
+          blocks: unknown[];
+          executions: unknown[];
+          version: number;
+        };
 
         for (const [spaceId, data] of spacePlanBlocks) {
           const extracted = extractPlanFromUIBlocks(spaceId, data.blocks, {
@@ -144,7 +387,7 @@ const migrateV3ToV4PlanData = (sessions: unknown[]) => {
           if (extracted) {
             extracted.plan.status = 'active'; // 旧数据已经是生成完毕的
             // 移除同 space 的旧 plan
-            existing.plans = existing.plans.filter((p: any) => p.spaceId !== spaceId);
+            existing.plans = existing.plans.filter(plan => plan.spaceId !== spaceId);
             existing.plans.push(extracted.plan);
             existing.tasks.push(...extracted.tasks);
             existing.blocks.push(...extracted.blocks);
@@ -178,6 +421,9 @@ export const useChatStore = create<ChatStore>()(
       workflowInterrupted: false, // 🆕 工作流是否中断
       lastFormStep: null, // 🆕 中断时的表单步骤
       currentWorkflowEvents: [], // 🆕 当前消息的工作流事件
+      pendingMutations: [],
+      hydrationStatus: 'idle',
+      syncErrorBySession: {},
 
       addMessage: (message: Message) => set((state) => {
         normalizeMessageRuntimeFields(message);
@@ -798,11 +1044,33 @@ export const useChatStore = create<ChatStore>()(
         updateSessionMessage(state.sessions, state.currentSessionId, messageId, sessionMessage => {
           sessionMessage.agent_execution = execution;
         });
-      })
+      }),
+
+      hydrateChatSessions,
+
+      flushChatSync: async (sessionId?: string) => {
+        const ids = sessionId
+          ? [sessionId]
+          : Array.from(new Set(get().pendingMutations.map(item => item.sessionId)));
+        ids.forEach(id => {
+          const timer = chatSyncTimers.get(id);
+          if (timer) clearTimeout(timer);
+          chatSyncTimers.delete(id);
+        });
+        const results = await Promise.all(ids.map(runChatSync));
+        const pending = results.find(result => result.status === 'pending');
+        return pending || { status: 'synced', error: null };
+      },
+
+      clearChatSyncIssue: (sessionId: string) => {
+        set(state => {
+          state.syncErrorBySession[sessionId] = null;
+        });
+      },
     })),
     {
       name: 'chat-storage',
-      version: 4,
+      version: 6,
       migrate: (persistedState: unknown, version?: number) => {
         if (!persistedState || typeof persistedState !== 'object') {
           return persistedState as Record<string, unknown>;
@@ -835,11 +1103,16 @@ export const useChatStore = create<ChatStore>()(
           };
         }
 
-        return {
+        const migrated = {
           ...state,
           sessions: sessions.map(session => sanitizeSessionForStorage(session as ChatSession)),
-          messages: legacyMessages.map(message => sanitizeMessageForStorage(message as Message))
+          messages: legacyMessages.map(message => sanitizeMessageForStorage(message as Message)),
+          pendingMutations: version !== undefined && version >= 6 &&
+            Array.isArray(state.pendingMutations)
+            ? state.pendingMutations
+            : [],
         };
+        return migrated;
       },
       onRehydrateStorage: () => (state) => {
         if (!state) {
@@ -857,14 +1130,14 @@ export const useChatStore = create<ChatStore>()(
         if (currentSession) {
           state.messages = currentSession.messages;
           state.currentSpaceId = currentSession.spaceId;
-          return;
+        } else {
+          const latestSession = state.sessions
+            .filter(session => session.spaceId === state.currentSpaceId)
+            .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+          state.currentSessionId = latestSession?.id ?? null;
+          state.messages = latestSession?.messages ?? [];
         }
-
-        const latestSession = state.sessions
-          .filter(session => session.spaceId === state.currentSpaceId)
-          .sort((a, b) => b.updatedAt - a.updatedAt)[0];
-        state.currentSessionId = latestSession?.id ?? null;
-        state.messages = latestSession?.messages ?? [];
+        refreshSessionObserver(state.sessions);
       },
       partialize: (state) => ({
         currentAgentId: state.currentAgentId,
@@ -874,9 +1147,48 @@ export const useChatStore = create<ChatStore>()(
         activeFormStep: state.activeFormStep,
         formStepsData: state.formStepsData,
         workflowInterrupted: state.workflowInterrupted,
-        lastFormStep: state.lastFormStep
+        lastFormStep: state.lastFormStep,
+        pendingMutations: state.pendingMutations,
         // ❌ 不需要持久化 currentWorkflowEvents，因为它只用于当前消息构建
       })
     }
   )
 );
+
+refreshSessionObserver(useChatStore.getState().sessions);
+
+useChatStore.subscribe((state) => {
+  if (suppressSessionObserver) return;
+  const nextFingerprints = new Map(
+    state.sessions.map(session => [session.id, sessionFingerprint(session)])
+  );
+  const nextSessions = new Map(state.sessions.map(session => [session.id, session]));
+  const changes: ChatSyncMutation[] = [];
+
+  for (const session of state.sessions) {
+    if (sessionFingerprints.get(session.id) !== nextFingerprints.get(session.id)) {
+      changes.push({
+        id: createSyncMutationId(),
+        kind: 'save_session_snapshot',
+        sessionId: session.id,
+        spaceId: session.spaceId,
+        payload: persistenceApi.buildSessionSnapshot(session),
+      });
+    }
+  }
+
+  for (const [sessionId, previous] of observedSessions) {
+    if (!nextSessions.has(sessionId)) {
+      changes.push({
+        id: createSyncMutationId(),
+        kind: 'delete_session',
+        sessionId,
+        spaceId: previous.spaceId,
+      });
+    }
+  }
+
+  sessionFingerprints = nextFingerprints;
+  observedSessions = nextSessions;
+  changes.forEach(enqueueChatMutation);
+});

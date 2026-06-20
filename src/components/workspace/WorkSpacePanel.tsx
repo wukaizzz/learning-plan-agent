@@ -34,7 +34,6 @@ export const WorkSpacePanel: React.FC = () => {
   const [showCreateDrawer, setShowCreateDrawer] = useState(false);
   const [showDeletedDrawer, setShowDeletedDrawer] = useState(false);
   const [editingSpace, setEditingSpace] = useState<StudySpace | null>(null);
-
   // 统计数据
   const stats = {
     total: spaces.length,

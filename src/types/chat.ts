@@ -2,6 +2,7 @@
 import type { UIBlock } from './uiBlocks';
 import type { WorkspaceState } from './uiBlocks';
 import type { WorkflowEvent } from './workflowEvents';
+import type { PersistenceSyncIssue } from './persistence';
 
 export interface AgentExecutionStep {
   stepId: string;
@@ -68,6 +69,31 @@ export interface ChatSession {
   scrollPosition: number; // 🆕 保存滚动位置
 }
 
+export interface ChatSessionSnapshot {
+  session: Omit<ChatSession, 'messages' | 'draftMessage' | 'scrollPosition'>;
+  messages: Message[];
+}
+
+export type ChatSyncMutation =
+  | {
+      id: string;
+      kind: 'save_session_snapshot';
+      sessionId: string;
+      spaceId: string | null;
+      payload: ChatSessionSnapshot;
+    }
+  | {
+      id: string;
+      kind: 'delete_session';
+      sessionId: string;
+      spaceId: string | null;
+    };
+
+export interface ChatSyncResult {
+  status: 'synced' | 'pending';
+  error: PersistenceSyncIssue | null;
+}
+
 export interface ChatStore {
   messages: Message[];
   currentAgentId: string | null;
@@ -82,6 +108,9 @@ export interface ChatStore {
   workflowInterrupted: boolean; // 🆕 工作流是否中断
   lastFormStep: number | null; // 🆕 中断时的表单步骤
   currentWorkflowEvents: WorkflowEvent[]; // 🆕 当前消息的工作流事件
+  pendingMutations: ChatSyncMutation[];
+  hydrationStatus: 'idle' | 'loading' | 'loaded' | 'error';
+  syncErrorBySession: Record<string, PersistenceSyncIssue | null>;
 
   // Actions
   addMessage: (message: Message) => void;
@@ -150,4 +179,7 @@ export interface ChatStore {
 
   // Agent Execution
   updateAgentExecution: (messageId: string, execution: AgentExecutionState) => void;
+  hydrateChatSessions: () => Promise<void>;
+  flushChatSync: (sessionId?: string) => Promise<ChatSyncResult>;
+  clearChatSyncIssue: (sessionId: string) => void;
 }

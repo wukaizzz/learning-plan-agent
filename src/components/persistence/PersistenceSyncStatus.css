@@ -1,0 +1,63 @@
+.persistence-sync-status {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  display: flex;
+  min-height: 34px;
+  max-width: min(360px, calc(100vw - 24px));
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #374151;
+  box-shadow: 0 4px 14px rgb(15 23 42 / 12%);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.persistence-sync-status--success {
+  border-color: #86efac;
+  color: #166534;
+}
+
+.persistence-sync-status--warning,
+.persistence-sync-status--waiting {
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.persistence-sync-status--error,
+.persistence-sync-status--offline {
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.persistence-sync-retry {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+}
+
+.persistence-sync-retry:hover {
+  background: rgb(0 0 0 / 6%);
+}
+
+.persistence-sync-spin {
+  animation: persistence-sync-spin 1s linear infinite;
+}
+
+@keyframes persistence-sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
