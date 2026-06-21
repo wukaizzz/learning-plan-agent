@@ -338,6 +338,9 @@ export interface UIBlock {
     confidence?: number;         // 置信度 0-1
     agent?: string;              // Agent标识
     version?: string;            // 版本信息
+    planId?: string;             // 后端持久化计划 ID
+    planVersion?: number;        // 后端持久化计划版本
+    persisted?: boolean;         // 该 Block 是否已由后端写入业务表
   };
 }
 

@@ -134,20 +134,25 @@ export function useStream() {
       const activeSpaceId = useChatStore.getState().currentSpaceId;
       if (activeSpaceId) {
         useSpaceStore.getState().updateSpace(activeSpaceId, { status: 'active' });
+        const currentBlocks = useChatStore.getState().uiBlocks;
 
         // 先 flush 防抖队列中的 draft save，确保 plan 已写入
         if (draftSaveTimerRef.current) {
           clearTimeout(draftSaveTimerRef.current);
           draftSaveTimerRef.current = null;
-          const currentBlocks = useChatStore.getState().uiBlocks;
           usePlanStore.getState().saveDraftBlocks(activeSpaceId, currentBlocks, {
             sessionId: useChatStore.getState().currentSessionId ?? undefined,
             messageId: currentMessageIdRef.current ?? undefined,
           });
         }
 
-        // 阶段 2：将 draft plan 标记为 active
-        usePlanStore.getState().activatePlan(activeSpaceId);
+        const backendPersisted = currentBlocks.some(
+          block => block.meta?.persisted === true && !!block.meta.planId
+        );
+        if (!backendPersisted) {
+          // 阶段 2：将 draft plan 标记为 active
+          usePlanStore.getState().activatePlan(activeSpaceId);
+        }
       }
     }
 

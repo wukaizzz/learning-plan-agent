@@ -635,9 +635,12 @@ export const usePlanStore = create<PlanStore>()(
         let persistedPlanId = '';
 
         set(state => {
-          const existingDraft = state.plans.find(
-            plan => plan.spaceId === spaceId && plan.status === 'draft'
-          );
+          const existingDraft = state.plans.find(plan => plan.id === extracted.plan.id) ||
+            (!extracted.persistedByBackend
+              ? state.plans.find(
+                  plan => plan.spaceId === spaceId && plan.status === 'draft'
+                )
+              : undefined);
 
           if (existingDraft) {
             persistedPlanId = existingDraft.id;
@@ -646,6 +649,8 @@ export const usePlanStore = create<PlanStore>()(
 
             existingDraft.updatedAt = Date.now();
             existingDraft.title = extracted.plan.title;
+            existingDraft.status = extracted.plan.status;
+            existingDraft.version = extracted.plan.version;
             if (meta?.sessionId) existingDraft.sourceSessionId = meta.sessionId;
             if (meta?.messageId) existingDraft.sourceMessageId = meta.messageId;
 
@@ -669,7 +674,7 @@ export const usePlanStore = create<PlanStore>()(
         });
 
         const snapshot = buildPlanSnapshot(get(), persistedPlanId);
-        if (snapshot) {
+        if (snapshot && !extracted.persistedByBackend) {
           enqueueMutation({
             id: createMutationId(),
             kind: 'save_snapshot',

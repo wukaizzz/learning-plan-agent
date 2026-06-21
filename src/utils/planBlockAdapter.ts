@@ -35,6 +35,7 @@ interface ExtractedPlan {
   plan: Plan;
   tasks: StudyTask[];
   blocks: PlanBlock[];
+  persistedByBackend: boolean;
 }
 
 export function normalizeSummaryCardProps(props: Record<string, unknown>): Record<string, unknown> {
@@ -78,7 +79,8 @@ export function extractPlanFromUIBlocks(
   const planBlocks = uiBlocks.filter(b => PLAN_BLOCK_TYPES.has(b.type));
   if (planBlocks.length === 0) return null;
 
-  const planId = `plan_${spaceId}_${Date.now()}`;
+  const backendMeta = planBlocks.find(block => block.meta?.planId)?.meta;
+  const planId = backendMeta?.planId || `plan_${spaceId}_${Date.now()}`;
   const now = Date.now();
 
   // 从 summary-card 提取标题（如果有）
@@ -113,8 +115,8 @@ export function extractPlanFromUIBlocks(
       id: planId,
       spaceId,
       title,
-      status: 'draft',
-      version: 1,
+      status: backendMeta?.persisted ? 'active' : 'draft',
+      version: backendMeta?.planVersion || 1,
       createdAt: now,
       updatedAt: now,
       sourceSessionId: meta?.sessionId,
@@ -122,6 +124,7 @@ export function extractPlanFromUIBlocks(
     },
     tasks: allTasks,
     blocks: allPlanBlocks,
+    persistedByBackend: backendMeta?.persisted === true,
   };
 }
 

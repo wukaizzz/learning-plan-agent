@@ -69,8 +69,10 @@ export interface AvailabilityInfo {
 }
 
 export interface CurrentPlan {
+  planId?: string;
   versionId: string;
   versionNumber: number;
+  status?: 'draft' | 'active' | 'paused' | 'completed' | 'archived';
   createdAt: string;
   lastModifiedAt: string;
 }
@@ -132,6 +134,7 @@ export interface UIBlock {
   title?: string;
   props: Record<string, unknown>;
   order?: number;
+  meta?: import('@/types/uiBlocks').UIBlock['meta'];
 }
 
 export interface InterruptionInfo {
@@ -345,15 +348,13 @@ export function mapWorkflowStage(stage: string): 'empty' | 'collecting' | 'analy
 /**
  * 将后端的 UIBlock 转换为前端 UIBlock 格式
  */
-export function transformUIBlock(block: { id: string; type: string; title?: string; props?: Record<string, unknown>; order?: number }): import('@/types/uiBlocks').UIBlock {
+export function transformUIBlock(block: { id: string; type: string; title?: string; props?: Record<string, unknown>; order?: number; meta?: import('@/types/uiBlocks').UIBlock['meta'] }): import('@/types/uiBlocks').UIBlock {
   return {
     id: block.id,
     type: block.type as import('@/types/uiBlocks').BlockType,
     title: block.title || '',
     props: block.props || {},
-    meta: {
-      timestamp: Date.now()
-    }
+    meta: block.meta || { timestamp: Date.now() }
   };
 }
 
