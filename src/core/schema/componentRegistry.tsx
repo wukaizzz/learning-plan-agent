@@ -20,6 +20,7 @@ import { RiskAlert } from '@/components/ui-blocks/RiskAlert/RiskAlert';
 import { ActionBar } from '@/components/ui-blocks/ActionBar/ActionBar';
 import { GeneratingSkeleton } from '@/components/ui-blocks/GeneratingSkeleton/GeneratingSkeleton';
 import { ThinkingBlock } from '@/components/ui-blocks/ThinkingBlock/ThinkingBlock';
+import { PlanChangePreview } from '@/components/ui-blocks/PlanChangePreview/PlanChangePreview';
 
 /**
  * 渲染上下文接口
@@ -100,7 +101,8 @@ const BLOCK_REGISTRY: Record<string, React.ComponentType<any>> = {
   'collection-form': CollectionForm, // ✅ 已实现
   'generating-skeleton': GeneratingSkeleton, // ✅ 已实现
   'workflow-indicator': WorkflowIndicator, // ✅ 已实现
-  'thinking-block': ThinkingBlock // ✅ 已实现
+  'thinking-block': ThinkingBlock, // ✅ 已实现
+  'plan-change-preview': PlanChangePreview
 };
 
 /**

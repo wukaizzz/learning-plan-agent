@@ -1,10 +1,11 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useChatStore } from '@/store/chatStore';
 import { usePlanStore } from '@/store/planStore';
 import { hydrateUIBlocksFromPlan } from '@/utils/planBlockAdapter';
 import { getLocalDateString } from '@/utils/dateUtils';
 import { isPlanGenerationState } from '@/components/study-space/spacePlanStatus';
 import type { UIBlock } from '@/types/uiBlocks';
+import * as planPersistenceApi from '@/services/planPersistenceApi';
 
 interface UsePlanHydrationResult {
   uiBlocks: UIBlock[];
@@ -28,6 +29,7 @@ export function usePlanHydration(spaceId: string | undefined): UsePlanHydrationR
   const blocks = usePlanStore(state => state.blocks);
   const hydratePlanBySpace = usePlanStore(state => state.hydratePlanBySpace);
   const rolloverOverdueTasks = usePlanStore(state => state.rolloverOverdueTasks);
+  const [pendingPreview, setPendingPreview] = useState<UIBlock | null>(null);
 
   const isActivelyStreaming =
     currentChatSpaceId === spaceId && isPlanGenerationState(workspaceState);
@@ -39,6 +41,14 @@ export function usePlanHydration(spaceId: string | undefined): UsePlanHydrationR
     void hydratePlanBySpace(spaceId).finally(() => {
       if (!cancelled) {
         rolloverOverdueTasks(spaceId, getLocalDateString());
+      }
+    });
+
+    void planPersistenceApi.getPendingPlanChangeSet(spaceId).then(changeSet => {
+      if (!cancelled) setPendingPreview(changeSet?.uiBlock || null);
+    }).catch(error => {
+      if (!cancelled) {
+        console.warn('[usePlanHydration] Failed to hydrate pending plan change', error);
       }
     });
 
@@ -77,11 +87,12 @@ export function usePlanHydration(spaceId: string | undefined): UsePlanHydrationR
     }
 
     if (plan) {
-      return hydrateUIBlocksFromPlan(plan, planBlocks, planTasks);
+      const hydrated = hydrateUIBlocksFromPlan(plan, planBlocks, planTasks);
+      return pendingPreview ? [...hydrated, pendingPreview] : hydrated;
     }
 
     return [] as UIBlock[];
-  }, [spaceId, isActivelyStreaming, runtimeBlocks, plan, planBlocks, planTasks]);
+  }, [spaceId, isActivelyStreaming, runtimeBlocks, plan, planBlocks, planTasks, pendingPreview]);
 
   const hasPlan = plan !== null && plan.status !== 'draft';
 

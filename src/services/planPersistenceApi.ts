@@ -4,6 +4,7 @@ import type {
   PlanSnapshot,
   StudyTask,
   StudyTaskStatus,
+  PlanChangeSetPreview,
 } from '@/types/plan';
 import { persistenceRequest } from '@/services/persistenceClient';
 
@@ -107,6 +108,39 @@ export async function getLatestExecutionBySpace(
 ): Promise<AgentExecutionRecord | null> {
   return persistenceRequest<AgentExecutionRecord | null>(
     `/spaces/${encodeURIComponent(spaceId)}/executions/latest`
+  );
+}
+
+export async function getPendingPlanChangeSet(
+  spaceId: string
+): Promise<PlanChangeSetPreview | null> {
+  return persistenceRequest<PlanChangeSetPreview | null>(
+    `/spaces/${encodeURIComponent(spaceId)}/plan-change-sets/pending`
+  );
+}
+
+export async function applyPlanChangeSet(
+  changeSetId: string,
+  input: {
+    expectedPlanId: string;
+    expectedPlanVersion: number;
+    idempotencyKey: string;
+  }
+): Promise<PlanSnapshot> {
+  const result = await persistenceRequest<PlanSnapshot>(
+    `/plan-change-sets/${encodeURIComponent(changeSetId)}/apply`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }
+  );
+  return normalizeSnapshot(result);
+}
+
+export async function rejectPlanChangeSet(changeSetId: string): Promise<void> {
+  await persistenceRequest(
+    `/plan-change-sets/${encodeURIComponent(changeSetId)}/reject`,
+    { method: 'POST' }
   );
 }
 

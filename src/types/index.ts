@@ -1,5 +1,6 @@
 export * from './agent'
 export * from './chat'
+export * from './createSpaceDraft'
 export * from './plan'
 export * from './space'
 export * from './tool'

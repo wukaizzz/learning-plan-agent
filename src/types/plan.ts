@@ -102,6 +102,15 @@ export interface PlanSnapshot {
   blocks: PlanBlock[];
 }
 
+export interface PlanChangeSetPreview {
+  changeSetId: string;
+  sourcePlanId: string;
+  sourcePlanVersion: number;
+  expiresAt: number;
+  canApply: boolean;
+  uiBlock: import('./uiBlocks').UIBlock;
+}
+
 export type PlanSyncMutation =
   | { id: string; kind: 'save_snapshot'; spaceId: string; payload: PlanSnapshot }
   | { id: string; kind: 'activate_plan'; spaceId: string; planId: string }

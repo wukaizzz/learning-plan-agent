@@ -36,7 +36,10 @@ export function useChat() {
       role: 'assistant',
       content,
       timestamp: Date.now(),
-      tool_calls: toolCalls,
+      tool_calls: toolCalls?.map(toolCall => ({
+        ...toolCall,
+        parameters: { ...toolCall.parameters }
+      })),
       thinkingActive: false,
       ...extras,
       workflow_events: extras?.workflow_events ?? bufferedWorkflowEvents

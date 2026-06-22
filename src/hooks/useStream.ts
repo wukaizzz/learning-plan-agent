@@ -176,25 +176,43 @@ export function useStream() {
       failed: 'failed'
     };
     const toolCallData: ToolCall = {
-      id: `tool_${Date.now()}`,
+      id: event.id || `tool_${Date.now()}`,
       tool_name: event.toolName,
-      parameters: event.parameters,
+      parameters: event.parameters || {},
       status: statusMap[event.status] || 'pending',
       result: event.result,
       error: event.error
     };
 
     if (event.status === 'pending') {
-      currentToolCallsRef.current.push(toolCallData);
+      currentToolCallsRef.current = [
+        ...currentToolCallsRef.current,
+        toolCallData
+      ];
+      const messageId = currentMessageIdRef.current;
+      if (messageId) {
+        useChatStore.getState().addToolCall(messageId, toolCallData);
+      }
     } else {
       const existingCall = currentToolCallsRef.current.find(
-        tc => tc.tool_name === event.toolName
+        toolCall => toolCall.id === toolCallData.id
+      ) || currentToolCallsRef.current.find(
+        toolCall => toolCall.tool_name === event.toolName
       );
       if (existingCall) {
-        Object.assign(existingCall, toolCallData);
+        currentToolCallsRef.current = currentToolCallsRef.current.map(toolCall =>
+          toolCall.id === existingCall.id
+            ? { ...toolCall, ...toolCallData, id: existingCall.id }
+            : toolCall
+        );
+        updateToolCall(existingCall.id, {
+          status: toolCallData.status,
+          result: toolCallData.result,
+          error: toolCallData.error
+        });
       }
     }
-  }, []);
+  }, [updateToolCall]);
 
   const clearThinkingFlushTimer = useCallback(() => {
     if (thinkingFlushTimerRef.current) {
@@ -319,6 +337,9 @@ export function useStream() {
       }
 
       addUIBlock(event.block);
+      if (event.block.type === 'plan-change-preview') {
+        addUIBlockToLastAssistantMessage(event.block);
+      }
 
       // 阶段 1：计划相关 block 防抖写入 planStore 作为 draft
       if (PLAN_BLOCK_TYPES.has(event.block.type)) {

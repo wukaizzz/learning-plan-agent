@@ -162,7 +162,7 @@ export const SpacePlanPage: React.FC = () => {
       {hasPlan ? (
         <PlanBlocksRenderer
           uiBlocks={uiBlocks}
-          allowedTypes={['summary-card', 'daily-task-list', 'risk-alert', 'action-bar']}
+          allowedTypes={['summary-card', 'daily-task-list', 'risk-alert', 'action-bar', 'plan-change-preview']}
           emptyTitle="暂无完整计划"
           emptyDescription="当前会话没有可渲染的计划 blocks。"
         />

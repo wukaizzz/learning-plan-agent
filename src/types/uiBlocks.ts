@@ -193,6 +193,36 @@ export const WorkflowIndicatorPropsSchema = z.object({
   }))
 });
 
+export const PlanChangePreviewPropsSchema = z.object({
+  changeSetId: z.string(),
+  sourcePlanId: z.string(),
+  sourcePlanVersion: z.number(),
+  expiresAt: z.number(),
+  reason: z.string(),
+  canApply: z.boolean(),
+  changes: z.array(z.object({
+    taskId: z.string(),
+    title: z.string(),
+    fromDate: z.string(),
+    toDate: z.string(),
+    estimatedMinutes: z.number(),
+    statusBefore: z.string(),
+    statusAfter: z.string()
+  })),
+  impact: z.object({
+    selectedTaskCount: z.number(),
+    movedTaskCount: z.number(),
+    affectedDates: z.array(z.string()),
+    affectedMinutes: z.number()
+  }),
+  unscheduled: z.array(z.object({
+    taskId: z.string(),
+    title: z.string(),
+    reason: z.string()
+  })),
+  command: z.literal('apply_plan_change_set')
+});
+
 /**
  * 🆕 UIBlock 判别联合类型 Schema (类型安全版本)
  *
@@ -312,6 +342,13 @@ export const UIBlockBaseSchema = z.union([
     title: z.string(),
     props: WorkflowIndicatorPropsSchema,
     meta: BlockMetaSchema
+  }),
+  z.object({
+    id: z.string(),
+    type: z.literal('plan-change-preview'),
+    title: z.string(),
+    props: PlanChangePreviewPropsSchema,
+    meta: BlockMetaSchema
   })
 ]);
 
@@ -358,7 +395,8 @@ export type BlockType =
   | 'collection-form'
   | 'generating-skeleton'
   | 'workflow-indicator'
-  | 'thinking-block';
+  | 'thinking-block'
+  | 'plan-change-preview';
 
 // ============= 各Block类型的特定Props定义 =============
 

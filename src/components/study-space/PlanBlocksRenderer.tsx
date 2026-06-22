@@ -7,7 +7,8 @@ const PLAN_BLOCK_TYPES = new Set([
   'study-timeline',
   'risk-alert',
   'progress-bar',
-  'action-bar'
+  'action-bar',
+  'plan-change-preview'
 ]);
 
 const ACTION_BLOCK_TYPES = new Set(['action-bar']);

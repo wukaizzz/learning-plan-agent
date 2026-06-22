@@ -3,36 +3,18 @@
  * 将复杂的创建流程拆分为5个步骤
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSpaceStore } from '../../../store/spaceStore';
+import { useCreateSpaceDraftStore } from '../../../store/createSpaceDraftStore';
+import type {
+  CreateSpaceDraft,
+  CreateSpaceFormData,
+  CreateSpaceWizardStep,
+  NumericDraftValue,
+  PendingSubjectDraft,
+} from '../../../types/createSpaceDraft';
 import type { StudyGoal, Subject, TimeSchedule } from '../../../types/space';
 import './CreateSpaceWizard.css';
-
-type WizardStep = 'basic' | 'goal' | 'subjects' | 'schedule' | 'review';
-
-// 表单数据类型定义
-interface SpaceFormData {
-  // 基础信息
-  name: string;
-  description: string;
-  color: string;
-
-  // 学习目标
-  primaryGoal: string;
-  secondaryGoals: string[];
-  examDate: string;
-  targetScore: number;
-
-  // 学科
-  subjects: Subject[];
-
-  // 时间安排
-  availableHoursPerDay: number;
-  availableDays: string[];
-  preferredTimeSlots: string[];
-  restDays: string[];
-  startDate: string;
-}
 
 interface CreateSpaceWizardProps {
   onComplete?: () => void;
@@ -41,57 +23,146 @@ interface CreateSpaceWizardProps {
 
 // 步骤定义
 const STEPS = [
-  { id: 'basic' as WizardStep, title: '基础信息', icon: '📝', description: '设置空间基本信息' },
-  { id: 'goal' as WizardStep, title: '学习目标', icon: '🎯', description: '定义学习目标和考试' },
-  { id: 'subjects' as WizardStep, title: '学科设置', icon: '📚', description: '添加学习学科' },
-  { id: 'schedule' as WizardStep, title: '时间安排', icon: '⏰', description: '设置学习时间表' },
-  { id: 'review' as WizardStep, title: '确认创建', icon: '✅', description: '检查并创建' }
+  { id: 'basic' as CreateSpaceWizardStep, title: '基础信息', icon: '📝', description: '设置空间基本信息' },
+  { id: 'goal' as CreateSpaceWizardStep, title: '学习目标', icon: '🎯', description: '定义学习目标和考试' },
+  { id: 'subjects' as CreateSpaceWizardStep, title: '学科设置', icon: '📚', description: '添加学习学科' },
+  { id: 'schedule' as CreateSpaceWizardStep, title: '时间安排', icon: '⏰', description: '设置学习时间表' },
+  { id: 'review' as CreateSpaceWizardStep, title: '确认创建', icon: '✅', description: '检查并创建' }
 ];
+
+const createDefaultFormData = (): CreateSpaceFormData => ({
+  name: '',
+  description: '',
+  color: '#3b82f6',
+  primaryGoal: '',
+  secondaryGoals: [],
+  examDate: '',
+  targetScore: 85,
+  subjects: [],
+  availableHoursPerDay: 4,
+  availableDays: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+  preferredTimeSlots: ['晚上'],
+  restDays: [],
+  startDate: new Date().toISOString().split('T')[0],
+});
+
+const createDefaultPendingSubject = (): PendingSubjectDraft => ({
+  name: '',
+  currentLevel: 60,
+  targetLevel: 85,
+  weight: 0.5,
+  weakPoints: [],
+  strongPoints: [],
+});
+
+const createDefaultDraft = (): CreateSpaceDraft => ({
+  currentStep: 'basic',
+  formData: createDefaultFormData(),
+  tempGoal: '',
+  pendingSubject: createDefaultPendingSubject(),
+  updatedAt: Date.now(),
+});
+
+const parseNumericDraft = (value: string): NumericDraftValue =>
+  value === '' ? '' : Number(value);
+
+const isNumberInRange = (
+  value: NumericDraftValue,
+  min: number,
+  max: number
+): value is number => typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
 
 export const CreateSpaceWizard: React.FC<CreateSpaceWizardProps> = ({
   onComplete,
   onCancel
 }) => {
-  const [currentStep, setCurrentStep] = useState<WizardStep>('basic');
   const createSpace = useSpaceStore((state) => state.createSpace);
+  const saveDraft = useCreateSpaceDraftStore((state) => state.saveDraft);
+  const clearDraft = useCreateSpaceDraftStore((state) => state.clearDraft);
+  const [initialDraft] = useState(() => useCreateSpaceDraftStore.getState().draft);
+  const [wizardDraft, setWizardDraft] = useState<CreateSpaceDraft>(
+    () => initialDraft ?? createDefaultDraft()
+  );
+  const [showRestoredNotice, setShowRestoredNotice] = useState(initialDraft !== null);
+  const latestDraftRef = useRef(wizardDraft);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasInteractedRef = useRef(initialDraft !== null);
+  const discardOnUnmountRef = useRef(false);
 
-  // 表单数据
-  const [formData, setFormData] = useState<SpaceFormData>({
-    // 基础信息
-    name: '',
-    description: '',
-    color: '#3b82f6',
+  const { currentStep, formData, tempGoal, pendingSubject } = wizardDraft;
 
-    // 学习目标
-    primaryGoal: '',
-    secondaryGoals: [],
-    examDate: '',
-    targetScore: 85,
+  const updateDraft = useCallback((updates: Partial<Omit<CreateSpaceDraft, 'updatedAt'>>) => {
+    hasInteractedRef.current = true;
+    setWizardDraft((current) => {
+      const next = {
+        ...current,
+        ...updates,
+        updatedAt: Date.now(),
+      };
+      latestDraftRef.current = next;
+      return next;
+    });
+  }, []);
 
-    // 学科
-    subjects: [],
+  const updateFormData = useCallback((updates: Partial<CreateSpaceFormData>) => {
+    hasInteractedRef.current = true;
+    setWizardDraft((current) => {
+      const next = {
+        ...current,
+        formData: {
+          ...current.formData,
+          ...updates,
+        },
+        updatedAt: Date.now(),
+      };
+      latestDraftRef.current = next;
+      return next;
+    });
+  }, []);
 
-    // 时间安排
-    availableHoursPerDay: 4,
-    availableDays: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-    preferredTimeSlots: ['晚上'],
-    restDays: [],
-    startDate: new Date().toISOString().split('T')[0]
-  });
+  useEffect(() => {
+    latestDraftRef.current = wizardDraft;
+    if (!hasInteractedRef.current) return;
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = setTimeout(() => {
+      saveDraft(latestDraftRef.current);
+      saveTimerRef.current = null;
+    }, 300);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, [saveDraft, wizardDraft]);
+
+  useEffect(() => () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    if (!discardOnUnmountRef.current && hasInteractedRef.current) {
+      saveDraft(latestDraftRef.current);
+    }
+  }, [saveDraft]);
 
   // 验证当前步骤
-  const validateStep = (step: WizardStep): boolean => {
+  const validateStep = (step: CreateSpaceWizardStep): boolean => {
     switch (step) {
       case 'basic':
         return formData.name.trim().length > 0 && formData.description.trim().length > 0;
       case 'goal':
         return formData.primaryGoal.trim().length > 0 &&
                formData.examDate.length > 0 &&
-               formData.targetScore > 0;
+               isNumberInRange(formData.targetScore, 1, 100);
       case 'subjects':
         return formData.subjects.length > 0;
       case 'schedule':
-        return formData.availableHoursPerDay > 0 && formData.availableDays.length > 0;
+        return isNumberInRange(formData.availableHoursPerDay, 1, 16) &&
+          formData.availableDays.length > 0;
       case 'review':
         return true;
       default:
@@ -111,7 +182,7 @@ export const CreateSpaceWizard: React.FC<CreateSpaceWizardProps> = ({
 
     const currentIndex = getCurrentStepIndex();
     if (currentIndex < STEPS.length - 1) {
-      setCurrentStep(STEPS[currentIndex + 1].id);
+      updateDraft({ currentStep: STEPS[currentIndex + 1].id });
     }
   };
 
@@ -119,12 +190,18 @@ export const CreateSpaceWizard: React.FC<CreateSpaceWizardProps> = ({
   const handlePrevious = () => {
     const currentIndex = getCurrentStepIndex();
     if (currentIndex > 0) {
-      setCurrentStep(STEPS[currentIndex - 1].id);
+      updateDraft({ currentStep: STEPS[currentIndex - 1].id });
     }
   };
 
   // 提交创建
   const handleSubmit = () => {
+    if (!isNumberInRange(formData.targetScore, 1, 100) ||
+        !isNumberInRange(formData.availableHoursPerDay, 1, 16)) {
+      alert('请检查目标分数和每日学习小时数');
+      return;
+    }
+
     try {
       const goal: StudyGoal = {
         primaryGoal: formData.primaryGoal,
@@ -150,6 +227,12 @@ export const CreateSpaceWizard: React.FC<CreateSpaceWizardProps> = ({
         schedule
       });
 
+      discardOnUnmountRef.current = true;
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      clearDraft();
       onComplete?.();
     } catch (error) {
       console.error('创建学习空间失败:', error);
@@ -157,8 +240,43 @@ export const CreateSpaceWizard: React.FC<CreateSpaceWizardProps> = ({
     }
   };
 
+  const handleCancel = () => {
+    discardOnUnmountRef.current = true;
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    clearDraft();
+    onCancel?.();
+  };
+
+  const handleDiscardDraft = () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    clearDraft();
+    hasInteractedRef.current = false;
+    setShowRestoredNotice(false);
+    const nextDraft = createDefaultDraft();
+    latestDraftRef.current = nextDraft;
+    setWizardDraft(nextDraft);
+  };
+
   return (
     <div className="wizard-container">
+      {showRestoredNotice && (
+        <div className="wizard-draft-notice" role="status">
+          <div>
+            <strong>已恢复上次创建进度</strong>
+            <span>你可以从离开时的步骤继续填写。</span>
+          </div>
+          <button type="button" onClick={handleDiscardDraft}>
+            放弃草稿
+          </button>
+        </div>
+      )}
+
       {/* 步骤指示器 */}
       <div className="wizard-steps">
         {STEPS.map((step, index) => {
@@ -173,7 +291,7 @@ export const CreateSpaceWizard: React.FC<CreateSpaceWizardProps> = ({
               onClick={() => {
                 // 只允许点击已完成的步骤
                 if (isCompleted) {
-                  setCurrentStep(step.id);
+                  updateDraft({ currentStep: step.id });
                 }
               }}
             >
@@ -197,25 +315,29 @@ export const CreateSpaceWizard: React.FC<CreateSpaceWizardProps> = ({
         {currentStep === 'basic' && (
           <BasicInfoStep
             data={formData}
-            onChange={(data) => setFormData({ ...formData, ...data })}
+            onChange={updateFormData}
           />
         )}
         {currentStep === 'goal' && (
           <GoalStep
             data={formData}
-            onChange={(data) => setFormData({ ...formData, ...data })}
+            tempGoal={tempGoal}
+            onTempGoalChange={(value) => updateDraft({ tempGoal: value })}
+            onChange={updateFormData}
           />
         )}
         {currentStep === 'subjects' && (
           <SubjectsStep
             data={formData}
-            onChange={(data) => setFormData({ ...formData, ...data })}
+            pendingSubject={pendingSubject}
+            onPendingSubjectChange={(value) => updateDraft({ pendingSubject: value })}
+            onChange={updateFormData}
           />
         )}
         {currentStep === 'schedule' && (
           <ScheduleStep
             data={formData}
-            onChange={(data) => setFormData({ ...formData, ...data })}
+            onChange={updateFormData}
           />
         )}
         {currentStep === 'review' && (
@@ -227,7 +349,7 @@ export const CreateSpaceWizard: React.FC<CreateSpaceWizardProps> = ({
       <div className="wizard-actions">
         <button
           className="wizard-button wizard-button-secondary"
-          onClick={onCancel}
+          onClick={handleCancel}
         >
           取消
         </button>
@@ -265,8 +387,8 @@ export const CreateSpaceWizard: React.FC<CreateSpaceWizardProps> = ({
 
 // ============= 步骤1：基础信息 =============
 interface BasicInfoStepProps {
-  data: SpaceFormData;
-  onChange: (data: Partial<SpaceFormData>) => void;
+  data: CreateSpaceFormData;
+  onChange: (data: Partial<CreateSpaceFormData>) => void;
 }
 
 const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
@@ -339,8 +461,17 @@ const BasicInfoStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
 };
 
 // ============= 步骤2：学习目标 =============
-const GoalStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
-  const [tempGoal, setTempGoal] = useState('');
+interface GoalStepProps extends BasicInfoStepProps {
+  tempGoal: string;
+  onTempGoalChange: (value: string) => void;
+}
+
+const GoalStep: React.FC<GoalStepProps> = ({
+  data,
+  onChange,
+  tempGoal,
+  onTempGoalChange,
+}) => {
 
   // Tab键快速补全默认值
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, field: string) => {
@@ -362,7 +493,7 @@ const GoalStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
       onChange({
         secondaryGoals: [...data.secondaryGoals, tempGoal.trim()]
       });
-      setTempGoal('');
+      onTempGoalChange('');
     }
   };
 
@@ -408,7 +539,7 @@ const GoalStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
           min="0"
           max="100"
           value={data.targetScore}
-          onChange={(e) => onChange({ targetScore: parseInt(e.target.value) || 0 })}
+          onChange={(e) => onChange({ targetScore: parseNumericDraft(e.target.value) })}
         />
       </div>
 
@@ -433,7 +564,7 @@ const GoalStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
             className="form-input"
             placeholder="添加次要目标..."
             value={tempGoal}
-            onChange={(e) => setTempGoal(e.target.value)}
+            onChange={(e) => onTempGoalChange(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && addSecondaryGoal()}
           />
           <button
@@ -449,15 +580,17 @@ const GoalStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
 };
 
 // ============= 步骤3：学科设置 =============
-const SubjectsStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
-  const [newSubject, setNewSubject] = useState({
-    name: '',
-    currentLevel: 60,
-    targetLevel: 85,
-    weight: 0.5,
-    weakPoints: [] as string[],
-    strongPoints: [] as string[]
-  });
+interface SubjectsStepProps extends BasicInfoStepProps {
+  pendingSubject: PendingSubjectDraft;
+  onPendingSubjectChange: (value: PendingSubjectDraft) => void;
+}
+
+const SubjectsStep: React.FC<SubjectsStepProps> = ({
+  data,
+  onChange,
+  pendingSubject,
+  onPendingSubjectChange,
+}) => {
   // Tab键快速补全默认值
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, field: string) => {
     if (e.key === 'Tab') {
@@ -470,8 +603,8 @@ const SubjectsStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
       };
 
       if (defaults[field] !== undefined) {
-        setNewSubject({
-          ...newSubject,
+        onPendingSubjectChange({
+          ...pendingSubject,
           [field]: defaults[field]
         });
       }
@@ -495,19 +628,27 @@ const SubjectsStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
   };
 
   const addSubject = () => {
-    if (newSubject.name.trim()) {
-      onChange({
-        subjects: [...data.subjects, { ...newSubject }]
-      });
-      setNewSubject({
-        name: '',
-        currentLevel: 60,
-        targetLevel: 85,
-        weight: 0.5,
-        weakPoints: [],
-        strongPoints: []
-      });
+    if (!pendingSubject.name.trim()) {
+      alert('请填写学科名称');
+      return;
     }
+    if (!isNumberInRange(pendingSubject.currentLevel, 0, 100) ||
+        !isNumberInRange(pendingSubject.targetLevel, 0, 100) ||
+        !isNumberInRange(pendingSubject.weight, 0, 1)) {
+      alert('请检查当前水平、目标水平和重要程度');
+      return;
+    }
+
+    const subject: Subject = {
+      ...pendingSubject,
+      currentLevel: pendingSubject.currentLevel,
+      targetLevel: pendingSubject.targetLevel,
+      weight: pendingSubject.weight,
+    };
+    onChange({
+      subjects: [...data.subjects, subject]
+    });
+    onPendingSubjectChange(createDefaultPendingSubject());
   };
 
   const removeSubject = (index: number) => {
@@ -568,8 +709,11 @@ const SubjectsStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
               type="text"
               className="form-input"
               placeholder="例如：高等数学"
-              value={newSubject.name}
-              onChange={(e) => setNewSubject({ ...newSubject, name: e.target.value })}
+              value={pendingSubject.name}
+              onChange={(e) => onPendingSubjectChange({
+                ...pendingSubject,
+                name: e.target.value,
+              })}
               onKeyDown={(e) => handleKeyDown(e, 'name')}
             />
           </div>
@@ -583,8 +727,11 @@ const SubjectsStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
               className="form-input"
               min="0"
               max="100"
-              value={newSubject.currentLevel}
-              onChange={(e) => setNewSubject({ ...newSubject, currentLevel: parseInt(e.target.value) || 0 })}
+              value={pendingSubject.currentLevel}
+              onChange={(e) => onPendingSubjectChange({
+                ...pendingSubject,
+                currentLevel: parseNumericDraft(e.target.value),
+              })}
               onKeyDown={(e) => handleKeyDown(e, 'currentLevel')}
             />
           </div>
@@ -595,8 +742,11 @@ const SubjectsStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
               className="form-input"
               min="0"
               max="100"
-              value={newSubject.targetLevel}
-              onChange={(e) => setNewSubject({ ...newSubject, targetLevel: parseInt(e.target.value) || 0 })}
+              value={pendingSubject.targetLevel}
+              onChange={(e) => onPendingSubjectChange({
+                ...pendingSubject,
+                targetLevel: parseNumericDraft(e.target.value),
+              })}
               onKeyDown={(e) => handleKeyDown(e, 'targetLevel')}
             />
           </div>
@@ -608,8 +758,11 @@ const SubjectsStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
               min="0"
               max="1"
               step="0.1"
-              value={newSubject.weight}
-              onChange={(e) => setNewSubject({ ...newSubject, weight: parseFloat(e.target.value) || 0 })}
+              value={pendingSubject.weight}
+              onChange={(e) => onPendingSubjectChange({
+                ...pendingSubject,
+                weight: parseNumericDraft(e.target.value),
+              })}
               onKeyDown={(e) => handleKeyDown(e, 'weight')}
             />
           </div>
@@ -661,7 +814,7 @@ const ScheduleStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
           min="1"
           max="16"
           value={data.availableHoursPerDay}
-          onChange={(e) => onChange({ availableHoursPerDay: parseInt(e.target.value) || 1 })}
+          onChange={(e) => onChange({ availableHoursPerDay: parseNumericDraft(e.target.value) })}
         />
       </div>
 
@@ -726,7 +879,7 @@ const ScheduleStep: React.FC<BasicInfoStepProps> = ({ data, onChange }) => {
 };
 
 // ============= 步骤5：确认创建 =============
-const ReviewStep: React.FC<{ data: SpaceFormData }> = ({ data }) => {
+const ReviewStep: React.FC<{ data: CreateSpaceFormData }> = ({ data }) => {
   return (
     <div className="wizard-step-content">
       <h3>确认创建</h3>

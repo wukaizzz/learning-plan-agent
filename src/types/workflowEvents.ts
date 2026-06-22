@@ -45,9 +45,11 @@ export interface InfoNeededEvent extends WorkflowEventMeta {
 // 工具调用事件
 export interface ToolCallEvent extends WorkflowEventMeta {
   type: 'tool_call';
+  id?: string;
   toolName: string;
   parameters: Record<string, unknown>;
   status: 'pending' | 'executing' | 'completed' | 'failed';
+  message?: string;
   result?: unknown;
   error?: string;
 }

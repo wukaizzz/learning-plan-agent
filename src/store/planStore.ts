@@ -324,6 +324,8 @@ const planStorage: PersistStorage<PersistedPlanState> = {
 
 const syncPromisesBySpace = new Map<string, Promise<PlanSyncResult>>();
 const hydrationPromisesBySpace = new Map<string, Promise<void>>();
+const executionSyncTimersBySpace = new Map<string, ReturnType<typeof setTimeout>>();
+const EXECUTION_SYNC_DEBOUNCE_MS = 500;
 
 const createMutationId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -415,6 +417,25 @@ const compactMutations = (
   ];
 };
 
+const shouldImmediatelySyncExecution = (record: AgentExecutionRecord) => (
+  record.status !== 'running' ||
+  record.steps.some(step => step.status === 'waiting_input' || step.status === 'failed')
+);
+
+const clearExecutionSyncTimer = (spaceId: string) => {
+  const timer = executionSyncTimersBySpace.get(spaceId);
+  if (timer) clearTimeout(timer);
+  executionSyncTimersBySpace.delete(spaceId);
+};
+
+const getNextReadyMutation = (spaceId: string) => {
+  const executionIsDebounced = executionSyncTimersBySpace.has(spaceId);
+  return usePlanStore.getState().pendingMutations.find(item => (
+    item.spaceId === spaceId &&
+    !(executionIsDebounced && item.kind === 'save_execution')
+  ));
+};
+
 const isPendingPlanMutation = (mutation: PlanSyncMutation) =>
   mutation.kind !== 'save_execution';
 
@@ -447,8 +468,7 @@ function runSpaceSync(spaceId: string): Promise<PlanSyncResult> {
 
   const syncPromise = (async (): Promise<PlanSyncResult> => {
     while (true) {
-      const mutation = usePlanStore.getState().pendingMutations
-        .find(item => item.spaceId === spaceId);
+      const mutation = getNextReadyMutation(spaceId);
 
       if (!mutation) {
         usePlanStore.setState(state => ({
@@ -582,6 +602,25 @@ function enqueueMutation(mutation: PlanSyncMutation) {
   usePlanStore.setState(state => ({
     pendingMutations: compactMutations(state.pendingMutations, mutation),
   }));
+
+  if (mutation.kind === 'save_execution') {
+    clearExecutionSyncTimer(mutation.spaceId);
+    if (shouldImmediatelySyncExecution(mutation.payload)) {
+      void runSpaceSync(mutation.spaceId);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      executionSyncTimersBySpace.delete(mutation.spaceId);
+      void runSpaceSync(mutation.spaceId);
+    }, EXECUTION_SYNC_DEBOUNCE_MS);
+    executionSyncTimersBySpace.set(mutation.spaceId, timer);
+    return;
+  }
+
+  if (mutation.kind === 'delete_space_plans') {
+    clearExecutionSyncTimer(mutation.spaceId);
+  }
   void runSpaceSync(mutation.spaceId);
 }
 
@@ -884,7 +923,10 @@ export const usePlanStore = create<PlanStore>()(
 
       hydratePlanBySpace: (spaceId: string) => hydrateSpace(spaceId),
 
-      flushPlanSync: (spaceId: string) => runSpaceSync(spaceId),
+      flushPlanSync: (spaceId: string) => {
+        clearExecutionSyncTimer(spaceId);
+        return runSpaceSync(spaceId);
+      },
 
       clearPlanSyncIssue: (spaceId: string) => {
         set(state => {
