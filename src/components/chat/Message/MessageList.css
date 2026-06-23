@@ -249,58 +249,6 @@
   }
 }
 
-.message-tool-calls {
-  margin-top: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.tool-call {
-  font-size: 0.75rem;
-  padding: 0.5rem;
-  border-radius: 0.25rem;
-}
-
-.tool-call-pending {
-  background-color: #fef3c7;
-  color: #92400e;
-}
-
-.tool-call-completed {
-  background-color: #d1fae5;
-  color: #065f46;
-}
-
-.tool-call-failed {
-  background-color: #fee2e2;
-  color: #991b1b;
-}
-
-.tool-call-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.tool-call-name {
-  font-weight: 600;
-}
-
-.tool-call-status {
-  text-transform: uppercase;
-}
-
-.tool-call-params {
-  margin-top: 0.25rem;
-  opacity: 0.75;
-}
-
-.tool-call-error {
-  margin-top: 0.25rem;
-  color: #991b1b;
-}
-
 .message-streaming {
   display: flex;
   align-items: center;

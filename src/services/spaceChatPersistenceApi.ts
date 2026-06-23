@@ -104,6 +104,11 @@ export function deserializeSpace(space: RemoteSpace): StudySpace {
   };
 }
 
+const PERSISTED_MESSAGE_BLOCK_TYPES = new Set([
+  'collection-form',
+  'schedule-task-list',
+]);
+
 export function sanitizeMessage(message: Message): Message {
   return {
     id: message.id,
@@ -111,7 +116,7 @@ export function sanitizeMessage(message: Message): Message {
     content: message.content,
     timestamp: message.timestamp,
     tool_calls: message.tool_calls,
-    ui_blocks: message.ui_blocks?.filter(block => block.type === 'collection-form'),
+    ui_blocks: message.ui_blocks?.filter(block => PERSISTED_MESSAGE_BLOCK_TYPES.has(block.type)),
     submitted_form_summary: message.submitted_form_summary,
     form_submission_state: message.form_submission_state,
     workflow_process_steps: message.workflow_process_steps,

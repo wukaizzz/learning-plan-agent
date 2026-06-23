@@ -96,6 +96,7 @@ export function useStream() {
     addUIBlock,
     clearUIBlocks,
     setWorkspaceState,
+    addUIBlockToMessage,
     addUIBlockToLastAssistantMessage,
     setCurrentWorkflowEvents,
     addWorkflowEvent,
@@ -322,6 +323,14 @@ export function useStream() {
     }
 
     if (event.action === 'add' && event.block) {
+      if (event.block.type === 'schedule-task-list') {
+        const targetMessageId = event.messageId || currentMessageIdRef.current;
+        if (targetMessageId) {
+          addUIBlockToMessage(targetMessageId, event.block);
+        }
+        return;
+      }
+
       if (event.block.type === 'collection-form') {
         if (!hasStartedStreaming.current) {
           const msg = addAssistantMessage(currentMessageRef.current, undefined, {
@@ -346,6 +355,14 @@ export function useStream() {
         scheduleDraftSave();
       }
     } else if (event.action === 'update' && event.block) {
+      if (event.block.type === 'schedule-task-list') {
+        const targetMessageId = event.messageId || currentMessageIdRef.current;
+        if (targetMessageId) {
+          addUIBlockToMessage(targetMessageId, event.block);
+        }
+        return;
+      }
+
       if (event.block.type === 'collection-form') {
         addUIBlockToLastAssistantMessage(event.block);
         return;
@@ -363,7 +380,7 @@ export function useStream() {
       // 移除指定block（需要在chatStore中实现removeUIBlock方法）
       console.log('Remove block:', event.blockId);
     }
-  }, [addAssistantMessage, addUIBlock, addUIBlockToLastAssistantMessage, scheduleDraftSave]);
+  }, [addAssistantMessage, addUIBlock, addUIBlockToMessage, addUIBlockToLastAssistantMessage, scheduleDraftSave]);
 
   const persistAgentExecution = useCallback((
     messageId: string,

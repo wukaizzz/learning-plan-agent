@@ -25,18 +25,23 @@ const messageHasCollectionForm = (message: Message) =>
 const messageHasWorkflowProcess = (message: Message) =>
   !!message.workflow_process_steps?.length;
 
+const PERSISTED_MESSAGE_BLOCK_TYPES = new Set([
+  'collection-form',
+  'schedule-task-list',
+]);
+
 // shouldPersistWorkflowEvent removed in v4 — workflow_events no longer persisted
 
 const sanitizeMessageForStorage = (message: Message): Message => {
   // v4 瘦身：删除 workflow_events、thinkingContent、thinkingDuration、完整 agent_execution
-  // 只保留 collection-form 用于表单恢复
+  // 只保留需要随消息恢复的交互或查询结果 Block
   return {
     id: message.id,
     role: message.role,
     content: message.content,
     timestamp: message.timestamp,
     tool_calls: message.tool_calls,
-    ui_blocks: message.ui_blocks?.filter(b => b.type === 'collection-form'),
+    ui_blocks: message.ui_blocks?.filter(block => PERSISTED_MESSAGE_BLOCK_TYPES.has(block.type)),
     submitted_form_summary: message.submitted_form_summary,
     form_submission_state: message.form_submission_state,
     workflow_process_steps: message.workflow_process_steps,

@@ -121,7 +121,6 @@ export const MessageList: React.FC<MessageListProps> = ({
       !lastAssistantMessage.thinkingContent &&
       !(lastAssistantMessage.ui_blocks?.length) &&
       !hasVisibleWorkflowEvents &&
-      !(lastAssistantMessage.tool_calls?.length) &&
       !lastAssistantMessage.agent_execution
     )
   );

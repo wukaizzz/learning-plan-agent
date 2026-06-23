@@ -193,6 +193,48 @@ export const WorkflowIndicatorPropsSchema = z.object({
   }))
 });
 
+const ScheduleSummarySchema = z.object({
+  totalTasks: z.number(),
+  totalMinutes: z.number(),
+  pendingTasks: z.number(),
+  inProgressTasks: z.number(),
+  completedTasks: z.number(),
+  skippedTasks: z.number(),
+  failedTasks: z.number()
+});
+
+const ScheduleTaskSchema = z.object({
+  id: z.string(),
+  order: z.number(),
+  title: z.string(),
+  subjectId: z.string().optional(),
+  subjectName: z.string(),
+  type: z.string(),
+  status: z.enum(['pending', 'in_progress', 'completed', 'skipped', 'failed']),
+  priority: z.enum(['high', 'medium', 'low']),
+  scheduledDate: z.string(),
+  estimatedMinutes: z.number(),
+  estimatedTime: z.string().optional()
+});
+
+export const ScheduleTaskListPropsSchema = z.object({
+  dateFrom: z.string(),
+  dateTo: z.string(),
+  dayCount: z.number(),
+  queriedAt: z.number(),
+  planId: z.string().optional(),
+  planVersion: z.number().optional(),
+  planUpdatedAt: z.string().optional(),
+  summary: ScheduleSummarySchema,
+  days: z.array(z.object({
+    date: z.string(),
+    weekday: z.string(),
+    summary: ScheduleSummarySchema,
+    tasks: z.array(ScheduleTaskSchema)
+  })),
+  readonly: z.literal(true)
+});
+
 export const PlanChangePreviewPropsSchema = z.object({
   changeSetId: z.string(),
   sourcePlanId: z.string(),
@@ -349,6 +391,13 @@ export const UIBlockBaseSchema = z.union([
     title: z.string(),
     props: PlanChangePreviewPropsSchema,
     meta: BlockMetaSchema
+  }),
+  z.object({
+    id: z.string(),
+    type: z.literal('schedule-task-list'),
+    title: z.string(),
+    props: ScheduleTaskListPropsSchema,
+    meta: BlockMetaSchema
   })
 ]);
 
@@ -396,7 +445,8 @@ export type BlockType =
   | 'generating-skeleton'
   | 'workflow-indicator'
   | 'thinking-block'
-  | 'plan-change-preview';
+  | 'plan-change-preview'
+  | 'schedule-task-list';
 
 // ============= 各Block类型的特定Props定义 =============
 
@@ -448,6 +498,50 @@ export interface DailyTaskListProps {
   scheduleGroups?: DailyScheduleGroup[];
   totalDuration: number;
   completionRate: number;
+}
+
+export interface ScheduleSummary {
+  totalTasks: number;
+  totalMinutes: number;
+  pendingTasks: number;
+  inProgressTasks: number;
+  completedTasks: number;
+  skippedTasks: number;
+  failedTasks: number;
+}
+
+export interface ScheduleTask {
+  id: string;
+  order: number;
+  title: string;
+  subjectId?: string;
+  subjectName: string;
+  type: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped' | 'failed';
+  priority: 'high' | 'medium' | 'low';
+  scheduledDate: string;
+  estimatedMinutes: number;
+  estimatedTime?: string;
+}
+
+export interface ScheduleDay {
+  date: string;
+  weekday: string;
+  summary: ScheduleSummary;
+  tasks: ScheduleTask[];
+}
+
+export interface ScheduleTaskListProps {
+  dateFrom: string;
+  dateTo: string;
+  dayCount: number;
+  queriedAt: number;
+  planId?: string;
+  planVersion?: number;
+  planUpdatedAt?: string;
+  summary: ScheduleSummary;
+  days: ScheduleDay[];
+  readonly: true;
 }
 
 /**

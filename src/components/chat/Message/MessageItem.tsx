@@ -162,55 +162,23 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onCollectionF
           </div>
         )}
 
-        {!isUser && !hasSubmittedSummary && embeddedBlocks.length > 0 && onCollectionFormSubmit && (
+        {!isUser && !hasSubmittedSummary && embeddedBlocks.length > 0 && (
           <div className="message-embedded-blocks">
-            {renderBlocks(embeddedBlocks, {
-              onSubmit: onCollectionFormSubmit,
-              isLoading: message.form_submission_state === 'submitting',
-              stepIndex: 0,
-              totalSteps: embeddedBlocks.length,
-              showProgress: embeddedBlocks.length > 1
-            })}
-          </div>
-        )}
-
-        {message.tool_calls && message.tool_calls.length > 0 && (
-          <div className="message-tool-calls">
-            {message.tool_calls.map((toolCall) => (
-              <ToolCallItem key={toolCall.id} toolCall={toolCall} />
-            ))}
+            {renderBlocks(
+              embeddedBlocks,
+              onCollectionFormSubmit
+                ? {
+                    onSubmit: onCollectionFormSubmit,
+                    isLoading: message.form_submission_state === 'submitting',
+                    stepIndex: 0,
+                    totalSteps: embeddedBlocks.length,
+                    showProgress: embeddedBlocks.length > 1
+                  }
+                : undefined
+            )}
           </div>
         )}
       </div>
-    </div>
-  );
-};
-
-
-interface ToolCallItemProps {
-  toolCall: {
-    id: string;
-    tool_name: string;
-    parameters: Record<string, unknown>;
-    result?: unknown;
-    status: 'pending' | 'completed' | 'failed';
-    error?: string;
-  };
-}
-
-const ToolCallItem: React.FC<ToolCallItemProps> = ({ toolCall }) => {
-  return (
-    <div className={`tool-call tool-call-${toolCall.status}`}>
-      <div className="tool-call-header">
-        <span className="tool-call-name">🔧 {toolCall.tool_name}</span>
-        <span className="tool-call-status">{toolCall.status}</span>
-      </div>
-      <div className="tool-call-params">
-        Params: {JSON.stringify(toolCall.parameters)}
-      </div>
-      {toolCall.status === 'failed' && toolCall.error && (
-        <div className="tool-call-error">Error: {toolCall.error}</div>
-      )}
     </div>
   );
 };
