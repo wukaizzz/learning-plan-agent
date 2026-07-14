@@ -1,0 +1,166 @@
+/**
+ * RiskAlert 组件样式
+ */
+
+.risk-alert {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  border: 2px solid transparent;
+}
+
+.risk-alert-high {
+  border-color: #ef4444;
+}
+
+.risk-alert-medium {
+  border-color: #f59e0b;
+}
+
+.risk-alert-low {
+  border-color: #3b82f6;
+}
+
+.risk-alert-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.risk-alert-title-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.risk-alert-icon {
+  font-size: 20px;
+}
+
+.risk-alert-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.risk-alert-count {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: #e5e7eb;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.risk-alert-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.risk-item {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 14px;
+  border-left: 4px solid transparent;
+}
+
+.risk-item.severity-high {
+  background: #fef2f2;
+  border-left-color: #ef4444;
+}
+
+.risk-item.severity-medium {
+  background: #fffbeb;
+  border-left-color: #f59e0b;
+}
+
+.risk-item.severity-low {
+  background: #eff6ff;
+  border-left-color: #3b82f6;
+}
+
+.risk-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.risk-item-icon {
+  font-size: 16px;
+}
+
+.risk-item-type {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.risk-item-severity {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.risk-item-severity.severity-high {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.risk-item-severity.severity-medium {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.risk-item-severity.severity-low {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.risk-item-message {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.risk-item-suggestion {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.suggestion-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.suggestion-text {
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.risk-alert-actions {
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+}
+
+.action-tip {
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+}

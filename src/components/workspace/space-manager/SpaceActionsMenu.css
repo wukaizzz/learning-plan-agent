@@ -1,0 +1,117 @@
+/* 学习空间操作菜单样式 */
+
+.space-actions-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.space-actions-trigger {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #9ca3af;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  padding: 4px;
+}
+
+.space-actions-trigger:hover {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.space-actions-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 180px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e5e7eb;
+  z-index: 100;
+  overflow: hidden;
+  animation: menuSlideIn 0.2s ease;
+}
+
+@keyframes menuSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.space-action-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.space-action-item:hover {
+  background: #f9fafb;
+}
+
+.space-action-item:first-child {
+  border-radius: 8px 8px 0 0;
+}
+
+.space-action-item:last-child {
+  border-radius: 0 0 8px 8px;
+}
+
+.action-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+.action-text {
+  flex: 1;
+  font-weight: 500;
+}
+
+.space-action-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 4px 0;
+}
+
+.space-action-danger {
+  color: #ef4444;
+}
+
+.space-action-danger:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+  .space-actions-dropdown {
+    right: -8px;
+    min-width: 160px;
+  }
+
+  .space-action-item {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}

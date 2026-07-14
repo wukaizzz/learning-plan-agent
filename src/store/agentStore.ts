@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AgentStore, AgentConfig } from '../types/agent';
+import type { AgentStore } from '../types/agent';
 import { immer } from 'zustand/middleware/immer';
 export const useAgentStore = create<AgentStore>()(
   persist(
@@ -10,11 +10,13 @@ export const useAgentStore = create<AgentStore>()(
           id: 'default',
           name: 'Default Assistant',
           description: 'A helpful AI assistant with access to various tools',
-          model: 'claude-3-5-sonnet-20241022',
+          model: 'deepseek-v3',
           temperature: 0.7,
-          max_tokens: 1024,
+          max_tokens: 12000,
           system_prompt: 'You are a helpful AI assistant with access to various tools. Use tools when appropriate to help answer questions.',
-          tools: ['weather', 'calculator', 'web_search']
+          tools: ['weather',  'web_search'],
+          enableWorkflow: true, // 🆕 启用工作流事件
+          autoTransition: true // 🆕 自动转换工作流状态
         }
       ],
       currentAgent: null,

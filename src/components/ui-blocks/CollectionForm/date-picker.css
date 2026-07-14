@@ -1,0 +1,66 @@
+.date-picker-container {
+  width: 100%;
+}
+
+.date-picker-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2937;
+  background: white;
+  transition: all 0.2s;
+  min-height: 38px;
+  cursor: pointer;
+}
+
+.date-picker-input:hover {
+  border-color: #9ca3af;
+}
+
+.date-picker-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.date-picker-input:disabled {
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.date-picker-input::placeholder {
+  color: #9ca3af;
+}
+
+.date-picker-error .date-picker-input {
+  border-color: #ef4444;
+}
+
+.date-picker-input-error:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.date-picker-error-text {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #ef4444;
+}
+
+/* 日历图标显示优化 */
+.date-picker-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.date-picker-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+.date-picker-input:disabled::-webkit-calendar-picker-indicator {
+  cursor: not-allowed;
+}

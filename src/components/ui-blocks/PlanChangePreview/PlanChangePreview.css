@@ -1,0 +1,122 @@
+.plan-change-preview {
+  border: 1px solid #b9c7e8;
+  border-radius: 8px;
+  background: #f8faff;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(44, 72, 130, 0.08);
+}
+
+.plan-change-preview-header {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: #274690;
+}
+
+.plan-change-preview-header h3,
+.plan-change-preview-header p {
+  margin: 0;
+}
+
+.plan-change-preview-header p {
+  margin-top: 4px;
+  color: #596579;
+  font-size: 14px;
+}
+
+.plan-change-preview-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 14px 0;
+  color: #4d596d;
+  font-size: 13px;
+}
+
+.plan-change-preview-list {
+  border-top: 1px solid #e0e6f2;
+}
+
+.plan-change-preview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e8ecf4;
+  font-size: 14px;
+}
+
+.plan-change-preview-row span {
+  color: #526079;
+}
+
+.plan-change-preview-warning {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  background: #fff7e8;
+  color: #8a5700;
+  border-left: 3px solid #e7a42b;
+}
+
+.plan-change-preview-warning p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.plan-change-preview-error {
+  margin: 12px 0 0;
+  color: #b42318;
+  font-size: 13px;
+}
+
+.plan-change-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.plan-change-preview-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.plan-change-preview-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.preview-reject {
+  background: #fff;
+  border-color: #ccd3df !important;
+  color: #344054;
+}
+
+.preview-apply {
+  background: #315fc5;
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .plan-change-preview-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .plan-change-preview-actions {
+    flex-direction: column-reverse;
+  }
+
+  .plan-change-preview-actions button {
+    justify-content: center;
+    width: 100%;
+  }
+}

@@ -1,5 +1,5 @@
 // Parse streaming responses
-export function parseStreamChunk(chunk: string): any {
+export function parseStreamChunk(chunk: string): unknown {
   try {
     return JSON.parse(chunk);
   } catch {

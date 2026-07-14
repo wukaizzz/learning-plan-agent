@@ -6,6 +6,15 @@
   overflow: hidden;
 }
 
+.chat-workspace-layout {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #f9fafb;
+}
+
 /* Main Chat Panel */
 .chat-panel {
   display: flex;
@@ -33,6 +42,17 @@
   flex: 1;
 }
 
+.chat-panel-title-with-exit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.chat-panel-title-info {
+  flex: 1;
+}
+
 .chat-panel-title {
   font-size: 1.25rem;
   font-weight: 700;
@@ -44,6 +64,36 @@
   font-size: 0.875rem;
   color: #4b5563;
   margin: 0.25rem 0 0 0;
+}
+
+.chat-panel-exit-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #f9fafb;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.chat-panel-exit-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.chat-panel-exit-btn:active {
+  background: #e5e7eb;
+}
+
+.chat-panel-exit-btn svg {
+  flex-shrink: 0;
 }
 
 .chat-panel-streaming {
@@ -59,8 +109,19 @@
 
 .chat-panel-messages {
   flex: 1;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   min-height: 0;
+  padding: 0 1.5rem;
+}
+
+.chat-panel-messages > .message-list {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
 }
 
 .chat-panel-no-api {
@@ -113,4 +174,39 @@
   font-size: 0.75rem;
   color: #6b7280;
   margin: 0;
+}
+
+@media (max-width: 920px) {
+  .chat-workspace-layout {
+    flex-direction: column;
+  }
+
+  .chat-panel {
+    min-height: 54vh;
+  }
+
+  .chat-panel-header {
+    padding: 0.875rem 1rem;
+  }
+
+  .chat-panel-messages {
+    padding: 0 1rem;
+  }
+
+  .chat-panel-messages > .message-list {
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .chat-panel-title-with-exit {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .chat-panel-exit-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
