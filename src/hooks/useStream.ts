@@ -7,6 +7,7 @@ import { usePlanStore } from '../store/planStore';
 import { API_ENDPOINT } from '../utils/constants';
 import { PLAN_BLOCK_TYPES } from '@/utils/planBlockAdapter';
 import { traceAgent } from '@/shared/debug/agentTrace';
+import { decodeWorkflowEvent, isWorkflowEventCurrent } from '@/core/stream/workflowEventDecoder';
 import type { Message, ToolCall, AgentExecutionState } from '../types/chat';
 import type { StudySpaceContext } from '@/utils/spaceContextMapper';
 import type { WorkflowStepEvent, InfoNeededEvent, ToolCallEvent, ProcessingEvent, AnalysisResultEvent, UIBlockUpdateEvent, ThinkingEvent, ThinkingEndEvent, IntentRoutedEvent, WorkflowEvent } from '../types/workflowEvents';
@@ -29,7 +30,7 @@ const sanitizeMessagesForApi = (messages: Message[]): ApiMessage[] =>
     .slice(-12)
     .map(({ role, content }) => ({ role, content }));
 
-type SSEChunkHandler = (chunk: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
+type SSEChunkHandler = (chunk: WorkflowEvent) => void;
 
 async function consumeSSE(
   reader: ReadableStreamDefaultReader<Uint8Array>,
@@ -62,7 +63,8 @@ async function consumeSSE(
           return;
         }
         try {
-          const chunk = JSON.parse(data);
+          const chunk = decodeWorkflowEvent(JSON.parse(data));
+          if (!chunk) continue;
           traceAgent({
             layer: 'frontend:consumeSSE',
             label: 'chunk parsed',
@@ -98,6 +100,7 @@ export function useStream() {
     setWorkspaceState,
     addUIBlockToMessage,
     addUIBlockToLastAssistantMessage,
+    removeUIBlock,
     setCurrentWorkflowEvents,
     addWorkflowEvent,
     updateMessageWorkflowEvents,
@@ -124,7 +127,7 @@ export function useStream() {
       eventType: 'workflow_step',
       data: { step: event.step, progress: event.progress }
     });
-    // 只同步后端工作流阶段，不从 workflowManager 注入本地 mock blocks。
+    // 只同步后端工作流阶段，UI Blocks 由后端事件提供。
     setWorkspaceState(event.step);
 
     if (event.step === 'collecting') {
@@ -378,9 +381,10 @@ export function useStream() {
       }
     } else if (event.action === 'remove' && event.blockId) {
       // 移除指定block（需要在chatStore中实现removeUIBlock方法）
-      console.log('Remove block:', event.blockId);
+      removeUIBlock(event.blockId, event.messageId || currentMessageIdRef.current || undefined);
+      scheduleDraftSave();
     }
-  }, [addAssistantMessage, addUIBlock, addUIBlockToMessage, addUIBlockToLastAssistantMessage, scheduleDraftSave]);
+  }, [addAssistantMessage, addUIBlock, addUIBlockToMessage, addUIBlockToLastAssistantMessage, removeUIBlock, scheduleDraftSave]);
 
   const persistAgentExecution = useCallback((
     messageId: string,
@@ -619,8 +623,8 @@ export function useStream() {
             }
 
             try {
-              const chunk = JSON.parse(data);
-              if (chunk.runId && chunk.runId !== activeRunIdRef.current) {
+              const chunk = decodeWorkflowEvent(JSON.parse(data));
+              if (!chunk || !isWorkflowEventCurrent(chunk.runId, activeRunIdRef.current)) {
                 continue;
               }
 

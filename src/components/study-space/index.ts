@@ -3,7 +3,6 @@ export {
   SpaceAgentChatPage,
   SpaceOverviewPage,
   SpacePlanPage,
-  SpaceReviewPage,
   SpaceSettingsPage,
   SpaceTasksPage,
   SpaceTimelinePage

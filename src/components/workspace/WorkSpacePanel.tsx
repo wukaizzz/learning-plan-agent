@@ -9,9 +9,7 @@ import { useSpaceStore } from '@/store/spaceStore';
 import { CreateSpaceWizard, DeletedSpacesList, EditSpaceForm, SpaceActionsMenu,SpaceCard } from '@/components/workspace/space-manager'
 import { SideDrawer } from '@/components/common/SideDrawer';
 import type { StudySpace, Subject, StudyGoal, TimeSchedule } from '@/types/space';
-import {LogoIcon,HomeIcon,SpaceIcon,PlanIcon,
-  TaskIcon,RecordIcon,ChartIcon,
-  GoalIcon,SettingsIcon,PlusIcon,GridIcon,ListIcon,
+import {LogoIcon,SpaceIcon,PlusIcon,GridIcon,ListIcon,
   ChevronDownIcon,SearchIcon,
 } from '@/components/workspace/icons';
 import { AIAdviceSection } from './AIAdviceSection';
@@ -19,10 +17,13 @@ import { CompressedStats } from './CompressedStats';
 import { HeroSprintSection } from './HeroSprintSection';
 import './WorkSpacePanel.css';
 
+const EXAMPLE_SPACE_NAME = '高等数学期末冲刺';
+
 export const WorkSpacePanel: React.FC = () => {
   const { getAllSpaces, softDeleteSpace, updateSpace, getDeletedSpaces, permanentlyDeleteSpace, restoreSpace, createSpace } = useSpaceStore();
   const spaces = getAllSpaces();
   const deletedSpaces = getDeletedSpaces();
+  const exampleSpace = spaces.find(space => space.name === EXAMPLE_SPACE_NAME);
 
   // 状态管理
   const [selectedTab, setSelectedTab] = useState<'all' | 'active' | 'upcoming' | 'completed' | 'paused'>('all');
@@ -42,18 +43,6 @@ export const WorkSpacePanel: React.FC = () => {
     upcoming: spaces.filter(s => s.status === 'planning').length,
     paused: spaces.filter(s => s.status === 'paused').length
   };
-
-  // 导航菜单项
-  const menuItems = [
-    { id: 'home', label: '首页', icon: HomeIcon },
-    { id: 'spaces', label: '学习空间', icon: SpaceIcon },
-    { id: 'plans', label: '学习计划', icon: PlanIcon },
-    { id: 'tasks', label: '每日任务', icon: TaskIcon },
-    { id: 'records', label: '学习记录', icon: RecordIcon },
-    { id: 'analytics', label: '数据分析', icon: ChartIcon },
-    { id: 'goals', label: '目标管理', icon: GoalIcon },
-    { id: 'settings', label: '设置中心', icon: SettingsIcon }
-  ];
 
   // 筛选空间
   const getFilteredSpaces = () => {
@@ -123,21 +112,6 @@ export const WorkSpacePanel: React.FC = () => {
     updateSpace(space.id, { status: newStatus });
   };
 
-  const handleStatsSpace = (space: StudySpace) => {
-    // TODO: 实现统计功能
-    alert(`查看"${space.name}"的学习统计 - 功能开发中`);
-  };
-
-  const handleShareSpace = (space: StudySpace) => {
-    // TODO: 实现分享功能
-    alert(`分享"${space.name}" - 功能开发中`);
-  };
-
-  const handleExportSpace = (space: StudySpace) => {
-    // TODO: 实现导出功能
-    alert(`导出"${space.name}"的学习报告 - 功能开发中`);
-  };
-
   const handleRestoreSpace = (spaceId: string) => {
     restoreSpace(spaceId);
   };
@@ -146,8 +120,16 @@ export const WorkSpacePanel: React.FC = () => {
     permanentlyDeleteSpace(spaceId);
   };
 
-  // 快速创建测试学习空间
+  // 加载一份可重复演示的真实学习空间数据
   const handleQuickCreateTestSpace = () => {
+    if (exampleSpace) return;
+
+    const deletedExampleSpace = deletedSpaces.find(space => space.name === EXAMPLE_SPACE_NAME);
+    if (deletedExampleSpace) {
+      restoreSpace(deletedExampleSpace.id);
+      return;
+    }
+
     const testSubjects: Subject[] = [
       {
         name: '高等数学',
@@ -183,7 +165,7 @@ export const WorkSpacePanel: React.FC = () => {
     };
 
     createSpace({
-      name: '高等数学期末冲刺',
+      name: EXAMPLE_SPACE_NAME,
       description: '为期末考试做好全面准备，重点复习微积分、线性代数和概率统计。',
       color: '#3b82f6',
       goal: testGoal,
@@ -191,7 +173,6 @@ export const WorkSpacePanel: React.FC = () => {
       schedule: testSchedule
     });
   };
-  // TODO 添加测试按钮功能
   return (
     <div className="workspace-panel">
       {/* 左侧导航栏 */}
@@ -204,26 +185,20 @@ export const WorkSpacePanel: React.FC = () => {
 
         {/* 主导航菜单 */}
         <nav className="sidebar-nav">
-          {menuItems.map((item) => (
-            <a
-              key={item.id}
-              href={`#${item.id}`}
-              className={`nav-item ${item.id === 'spaces' ? 'nav-item-active' : ''}`}
-            >
-              <item.icon />
-              <span>{item.label}</span>
-            </a>
-          ))}
+          <div className="nav-item nav-item-active" aria-current="page">
+            <SpaceIcon />
+            <span>学习空间</span>
+          </div>
         </nav>
 
         {/* 底部用户信息 */}
         <div className="sidebar-user">
           <div className="user-avatar">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Emma" alt="avatar" />
+            AI
           </div>
           <div className="user-info">
-            <div className="user-name">Emma</div>
-            <div className="user-role">学生版</div>
+            <div className="user-name">本地用户</div>
+            <div className="user-role">单用户开发版</div>
           </div>
           <button className="user-dropdown">
             <ChevronDownIcon />
@@ -249,14 +224,14 @@ export const WorkSpacePanel: React.FC = () => {
                 已删除空间 ({deletedSpaces.length})
               </button>
             )}
-            {/* 测试模式按钮 - 位于创建按钮的左侧 */}
             <button
               className={`btn-test-space ${spaces.length > 0 ? 'btn-test-space-compact' : ''}`}
               onClick={handleQuickCreateTestSpace}
-              title="快速创建测试学习空间"
+              disabled={Boolean(exampleSpace)}
+              title="加载一份可持久化的示例学习空间"
             >
               <Rocket size={17} />
-              测试模式
+              {exampleSpace ? '示例空间已加载' : '加载示例空间'}
             </button> 
 
             <button className="btn-create-space" onClick={handleCreateSpace}>
@@ -367,9 +342,6 @@ export const WorkSpacePanel: React.FC = () => {
                       onEdit={() => handleEditSpace(space)}
                       onDelete={() => handleDeleteSpace(space)}
                       onPause={() => handlePauseSpace(space)}
-                      onStats={() => handleStatsSpace(space)}
-                      onShare={() => handleShareSpace(space)}
-                      onExport={() => handleExportSpace(space)}
                     />
                   </div>
                 ))

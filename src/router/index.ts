@@ -5,7 +5,6 @@ import {
   SpaceAgentChatPage,
   SpaceOverviewPage,
   SpacePlanPage,
-  SpaceReviewPage,
   SpaceSettingsPage,
   SpaceTasksPage,
   SpaceTimelinePage,
@@ -48,10 +47,6 @@ const router = createBrowserRouter([
       {
         path: 'timeline',
         Component: SpaceTimelinePage,
-      },
-      {
-        path: 'review',
-        Component: SpaceReviewPage,
       },
       {
         path: 'settings',

@@ -91,7 +91,6 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
   const [focusTask, setFocusTask] = useState<DailyTaskItem | null>(null);
   const [focusTotalSeconds, setFocusTotalSeconds] = useState(0);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
-  const [isFocusExpired, setIsFocusExpired] = useState(false);
   const taskStatesRef = useRef<Record<string, TaskStatus>>({});
   const clickTimerRef = useRef<number | null>(null);
   const preFocusStatusRef = useRef<TaskStatus>('pending');
@@ -110,11 +109,7 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
     }
     return Array.from(byId.values());
   }, [tasks, scheduleGroups]);
-
-  useEffect(() => {
-    taskStatesRef.current = {};
-    setTaskStates({});
-  }, [allTaskItems]);
+  const isFocusExpired = Boolean(focusTask && remainingSeconds === 0);
 
   useEffect(() => {
     return () => {
@@ -135,12 +130,6 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
 
     return () => window.clearInterval(timerId);
   }, [focusTask, isFocusExpired]);
-
-  useEffect(() => {
-    if (focusTask && remainingSeconds === 0) {
-      setIsFocusExpired(true);
-    }
-  }, [focusTask, remainingSeconds]);
 
   const getCurrentTaskStatus = (taskId: string): TaskStatus => {
     return taskStatesRef.current[taskId] || allTaskItems.find(task => task.id === taskId)?.status || 'pending';
@@ -168,7 +157,6 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
     setFocusTask(null);
     setFocusTotalSeconds(0);
     setRemainingSeconds(0);
-    setIsFocusExpired(false);
   };
 
   const startFocusSession = (task: DailyTaskItem) => {
@@ -183,7 +171,6 @@ export const DailyTaskList: React.FC<DailyTaskListComponentProps> = ({
     setFocusTask(task);
     setFocusTotalSeconds(totalSeconds);
     setRemainingSeconds(totalSeconds);
-    setIsFocusExpired(false);
   };
 
   const handleTaskClick = (task: DailyTaskItem) => {

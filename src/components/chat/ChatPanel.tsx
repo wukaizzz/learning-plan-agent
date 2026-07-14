@@ -3,7 +3,7 @@ import { useParams } from 'react-router';
 import { MessageList, MessageInput } from '@/components/chat/message';
 import { WorkflowSection } from './WorkflowSection';
 import { WorkflowResumePrompt } from '@/components/workflow-resume/WorkflowResumePrompt';
-import { useChat, useStream, useAgent, useWorkflow } from '@/hooks';
+import { useChat, useStream, useAgent } from '@/hooks';
 import { useChatStore, useSpaceStore } from '@/store';
 import { traceAgent } from '@/shared/debug/agentTrace';
 import { mapSpaceToContext } from '@/utils/spaceContextMapper';
@@ -60,7 +60,6 @@ export const ChatPanel: React.FC = () => {
   const { getCurrentAgentConfig } = useAgent();
   const {
     switchToSpaceSession,
-    resetFormCollection,
     createNewSession,
     uiBlocks,
     submitFormStep,
@@ -77,7 +76,6 @@ export const ChatPanel: React.FC = () => {
   const formStepsData = useChatStore(state => state.formStepsData);
   const setActiveFormStep = useChatStore(state => state.setActiveFormStep);
   const currentSessionId = useChatStore(state => state.currentSessionId);
-  const { transitionToState, isWorkflowActive } = useWorkflow();
   const { spaceId } = useParams();
   const { getCurrentSpace } = useSpaceStore();
   const spaces = useSpaceStore(state => state.spaces);
@@ -107,14 +105,6 @@ export const ChatPanel: React.FC = () => {
     if (activeFormStep !== localFormStep && localFormStep !== null) {
       setActiveFormStep(localFormStep);
     }
-  };
-
-  const handleRestartWorkflow = () => {
-    setShowResumePrompt(false);
-    setLocalFormStep(0);
-    resetFormCollection();
-    setActiveFormStep(0);
-    transitionToState('collecting');
   };
 
   const handleDismissResumePrompt = () => {
@@ -285,7 +275,6 @@ export const ChatPanel: React.FC = () => {
             stepIndex={activeFormStep}
             totalSteps={3}
             onResume={handleResumeWorkflow}
-            onRestart={handleRestartWorkflow}
             onDismiss={handleDismissResumePrompt}
           />
         )}
@@ -306,13 +295,10 @@ export const ChatPanel: React.FC = () => {
         </div>
 
         <div className="chat-panel-messages">
-          {isWorkflowActive && (
-            <WorkflowSection
-              workspaceState={workspaceState}
-              uiBlocks={uiBlocks}
-              onStateChange={transitionToState}
-            />
-          )}
+          <WorkflowSection
+            workspaceState={workspaceState}
+            uiBlocks={uiBlocks}
+          />
           <MessageList
             messages={messages}
             isStreaming={isStreaming}

@@ -57,9 +57,16 @@ Desktop.ini
 # 测试
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
 
 # 其他缓存
 *.tsbuildinfo
 
-*.md
-*.txt
+# 明确的本地笔记（项目文档和测试文件应提交）
+.local-notes/
+build_md/
+memory.md
+process.md
+project-direction.txt
+LANGGRAPH_IMPLEMENTATION_ROADMAP.md

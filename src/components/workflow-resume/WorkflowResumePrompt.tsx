@@ -4,18 +4,17 @@
  *
  * 功能：
  * - 当工作流中断时显示恢复提示
- * - 提供"继续工作流"和"重新开始"按钮
+ * - 提供继续和关闭操作
  */
 
 import React from 'react';
-import { Play, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Play, AlertTriangle } from 'lucide-react';
 import './WorkflowResumePrompt.css';
 
 interface WorkflowResumePromptProps {
   stepIndex: number;
   totalSteps: number;
   onResume: () => void;
-  onRestart: () => void;
   onDismiss?: () => void;
 }
 
@@ -23,7 +22,6 @@ export const WorkflowResumePrompt: React.FC<WorkflowResumePromptProps> = ({
   stepIndex,
   totalSteps,
   onResume,
-  onRestart,
   onDismiss
 }) => {
   return (
@@ -47,13 +45,6 @@ export const WorkflowResumePrompt: React.FC<WorkflowResumePromptProps> = ({
           >
             <Play size={16} />
             继续工作流
-          </button>
-          <button
-            className="workflow-resume-prompt-button workflow-resume-prompt-button-secondary"
-            onClick={onRestart}
-          >
-            <RotateCcw size={16} />
-            重新开始
           </button>
           {onDismiss && (
             <button

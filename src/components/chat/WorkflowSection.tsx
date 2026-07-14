@@ -12,7 +12,6 @@ const WORKFLOW_BLOCK_TYPES = new Set([
 interface WorkflowSectionProps {
   workspaceState: WorkspaceState;
   uiBlocks: UIBlock[];
-  onStateChange?: (newState: WorkspaceState) => void;
 }
 
 export const WorkflowSection: React.FC<WorkflowSectionProps> = ({

@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarRange, CheckSquare, ClipboardList, LayoutDashboard, Lock, MessageSquare, RotateCcw, Settings } from 'lucide-react';
+import { ArrowLeft, CalendarRange, CheckSquare, ClipboardList, LayoutDashboard, Lock, MessageSquare, Settings } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router';
 import type { StudySpace } from '@/types/space';
 import type { WorkspaceState } from '@/types/uiBlocks';
@@ -24,8 +24,7 @@ const navItems = [
   { label: '今日任务', path: 'tasks', icon: CheckSquare, requiresPlan: true },
   { label: '学习计划', path: 'plan', icon: ClipboardList, requiresPlan: true },
   { label: '学习时间线', path: 'timeline', icon: CalendarRange, requiresPlan: true },
-  { label: '复盘记录', path: 'review', icon: RotateCcw, requiresPlan: true },
-  { label: '空间设置', path: 'settings', icon: Settings, requiresPlan: false }
+  { label: '空间信息', path: 'settings', icon: Settings, requiresPlan: false }
 ];
 
 export const SpaceNavSidebar: React.FC<SpaceNavSidebarProps> = ({ space, hasPlan, workspaceState }) => {

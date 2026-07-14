@@ -1,6 +1,6 @@
 /**
  * 学习空间操作菜单组件
- * 提供编辑、删除、暂停、统计、分享、导出等完整操作
+ * 仅提供已有真实行为的编辑、暂停/恢复和删除操作
  */
 
 import React, { useRef, useEffect, useState } from 'react';
@@ -12,19 +12,13 @@ export interface SpaceActionsMenuProps {
   onEdit: () => void;
   onDelete: () => void;
   onPause: () => void;
-  onStats: () => void;
-  onShare: () => void;
-  onExport: () => void;
 }
 
 export const SpaceActionsMenu: React.FC<SpaceActionsMenuProps> = ({
   space,
   onEdit,
   onDelete,
-  onPause,
-  onStats,
-  onShare,
-  onExport
+  onPause
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -102,33 +96,6 @@ export const SpaceActionsMenu: React.FC<SpaceActionsMenuProps> = ({
             <span className="action-text">
               {space.status === 'active' ? '暂停学习' : '恢复学习'}
             </span>
-          </button>
-
-          {/* 查看统计 */}
-          <button
-            className="space-action-item"
-            onClick={() => handleAction(onStats)}
-          >
-            <span className="action-icon">📊</span>
-            <span className="action-text">查看统计</span>
-          </button>
-
-          {/* 分享空间 */}
-          <button
-            className="space-action-item"
-            onClick={() => handleAction(onShare)}
-          >
-            <span className="action-icon">🔗</span>
-            <span className="action-text">分享空间</span>
-          </button>
-
-          {/* 导出报告 */}
-          <button
-            className="space-action-item"
-            onClick={() => handleAction(onExport)}
-          >
-            <span className="action-icon">📥</span>
-            <span className="action-text">导出报告</span>
           </button>
 
           {/* 分隔线 */}

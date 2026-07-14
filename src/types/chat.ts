@@ -129,6 +129,7 @@ export interface ChatStore {
   updateLastAssistantMessage: (content: string) => void;
   addUIBlockToMessage: (messageId: string, block: UIBlock) => void;
   addUIBlockToLastAssistantMessage: (block: UIBlock) => void;
+  removeUIBlock: (blockId: string, messageId?: string) => void;
   markLatestCollectionFormSubmitting: () => void;
   markLatestCollectionFormSubmitted: (summary: SubmittedFormSummaryItem[]) => void;
   resetLatestCollectionFormSubmissionState: () => void;

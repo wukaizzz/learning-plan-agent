@@ -29,7 +29,10 @@ const BlockMetaSchema = z.object({
   timestamp: z.number(),
   confidence: z.number().optional(),
   agent: z.string().optional(),
-  version: z.string().optional()
+  version: z.string().optional(),
+  planId: z.string().optional(),
+  planVersion: z.number().optional(),
+  persisted: z.boolean().optional()
 }).optional();
 
 /**
@@ -365,7 +368,7 @@ export const UIBlockBaseSchema = z.union([
     type: z.literal('collection-form'),
     title: z.string(),
     props: CollectionFormPropsSchema,
-    meta: BlockMetaSchema
+    meta: BlockMetaSchema.optional()
   }),
 
   // GeneratingSkeleton Block

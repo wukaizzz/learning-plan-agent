@@ -192,17 +192,11 @@ export const SpaceTimelinePage: React.FC = () => {
   );
 };
 
-export const SpaceReviewPage: React.FC = () => (
-  <SpacePageShell title="复盘记录" description="完成任务后，这里会承载复盘数据。">
-    <LockedPageMessage message="生成计划并完成任务后，这里会展示复盘数据" />
-  </SpacePageShell>
-);
-
 export const SpaceSettingsPage: React.FC = () => {
   const { space } = useSpacePageData();
 
   return (
-    <SpacePageShell title="空间设置" description="当前阶段只读展示学习空间基础字段。">
+    <SpacePageShell title="空间信息" description="查看学习空间的基础目标、科目和时间安排。">
       {space ? <SpaceInfoDetails space={space} compact /> : <LockedPageMessage message="未找到当前学习空间" />}
     </SpacePageShell>
   );

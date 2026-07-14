@@ -639,6 +639,27 @@ export const useChatStore = create<ChatStore>()(
         updateSessionMessage(state.sessions, state.currentSessionId, lastMessage.id, updater);
       }),
 
+      removeUIBlock: (blockId: string, messageId?: string) => set((state) => {
+        state.uiBlocks = state.uiBlocks.filter(block => block.id !== blockId);
+
+        const removeFromMessage = (message: Message) => {
+          message.ui_blocks = message.ui_blocks?.filter(block => block.id !== blockId);
+        };
+
+        if (messageId) {
+          const message = state.messages.find(item => item.id === messageId);
+          if (message) removeFromMessage(message);
+          updateSessionMessage(state.sessions, state.currentSessionId, messageId, removeFromMessage);
+          return;
+        }
+
+        state.messages.forEach(removeFromMessage);
+        const session = state.currentSessionId
+          ? state.sessions.find(item => item.id === state.currentSessionId)
+          : null;
+        session?.messages.forEach(removeFromMessage);
+      }),
+
       markLatestCollectionFormSubmitting: () => set((state) => {
         const message = [...state.messages].reverse().find(messageHasCollectionForm);
         if (!message) {

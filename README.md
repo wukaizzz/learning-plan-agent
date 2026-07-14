@@ -1,348 +1,151 @@
-# AI 学习规划 Agent Web App
+# AI 学习规划 Agent
 
-一个面向学生/自学者的 AI 学习规划 Agent Web 应用。不仅提供智能对话功能，更重要的是实现了**完整的学习空间管理系统**，支持学习目标创建、智能规划、任务管理和进度追踪。
+面向 AI 全栈岗位的学习规划作品。用户创建或加载学习空间后，系统通过 SSE 展示 Agent 执行过程，由 LLM 拆解学习任务，再由确定性调度器生成可复现日程，最终通过 UI Blocks 展示并持久化到 PostgreSQL。
 
-> **当前状态**: 基础架构完成，核心功能开发阶段 (45%完成度)
-> **技术特点**: React 19 + TypeScript + Zustand + 侧边抽屉UI + 分步向导
+> 当前版本：`v1.0.0-portfolio` 候选版本。本项目采用前后端双仓库，本仓库是作品主页；[后端仓库](https://github.com/wukaizzz/learning-plan-agent-backend)承载 Express、LangGraph、DeepSeek 与 PostgreSQL。
 
-## Features
+## 作品截图
 
-### 🎯 学习空间管理系统 (已完成)
-- **📚 完整CRUD操作** - 创建、编辑、删除学习空间
-- **🔄 软删除机制** - 30天恢复期，防止误操作
-- **📝 分步创建向导** - 5步骤智能引导，降低复杂度
-- **⚙️ 完整操作菜单** - 编辑、删除、暂停/恢复、统计、分享、导出
-- **📱 现代化UI** - 侧边抽屉、响应式设计、流畅动画
+| 学习空间 | SSE 生成过程 | 最终计划 |
+| --- | --- | --- |
+| ![学习空间](docs/screenshots/01-study-spaces.png) | ![SSE 生成过程](docs/screenshots/02-sse-generating.png) | ![最终计划](docs/screenshots/03-final-plan.png) |
 
-### 🤖 AI Agent 能力 (开发中)
-- **🧠 智能对话** - 基于Claude 3.5的自然语言交互
-- **📊 实时流式响应** - 观看AI回复的生成过程
-- **🔧 工具调用** - 支持工具
-- **💾 持久化存储** - 聊天记录和学习状态本地保存
-- **🔒 空间隔离** - 每个学习空间独立的聊天记录和对话上下文
+截图由 Playwright 作品集 Smoke Test 的固定 HTTP/SSE fixture 生成，可通过 `CAPTURE_PORTFOLIO_SCREENSHOTS=1 pnpm test:e2e` 重现。
 
-### 🎨 技术特性
-- **⚡ 快速开发** - Vite构建，热重载，TypeScript类型安全
-- **🎭 状态管理** - Zustand + Immer，简洁高效的状态管理
-- **🎨 现代UI** - 侧边抽屉、模态框、分步向导等丰富交互
-- **📱 响应式设计** - 完美适配桌面和移动设备
+## 核心闭环
 
-## Tech Stack
+1. 创建或加载一份学习空间。
+2. 前端调用 `/api/chat`，通过 SSE 接收工作流步骤和 Agent 执行事件。
+3. DeepSeek 负责目标分析、风险判断和任务框架拆解。
+4. 确定性调度器根据考试日期、每日容量和依赖关系安排具体日期。
+5. 后端构建 `summary-card`、`daily-task-list`、`study-timeline` 等 UI Blocks。
+6. PostgreSQL 保存空间、聊天、计划、任务、Block 与调整变更集；LangGraph checkpoint 独立保存工作流恢复状态。
+7. 用户可以查询日程、生成调整预览，并显式拒绝或确认应用新计划版本。
 
-- **Frontend**: React 19 + TypeScript
-- **Build Tool**: Vite 8
-- **State Management**: Zustand + Immer
-- **Styling**: 自定义CSS + 侧边抽屉组件
-- **AI SDK**: Anthropic SDK (Claude)
-- **Package Manager**: pnpm
-
-## Project Structure
-
-```
-src/
-├── components/           # UI Components
-│   ├── workspace/       # 学习空间管理 ✅
-│   │   ├── WorkSpacePanel.tsx    # 主管理面板
-│   │   ├── SpaceCard.tsx         # 空间卡片
-│   │   ├── CreateSpaceWizard.tsx # 分步创建向导
-│   │   ├── EditSpaceForm.tsx     # 编辑表单
-│   │   ├── SpaceActionsMenu.tsx  # 操作菜单
-│   │   └── DeletedSpacesList.tsx # 已删除空间
-│   ├── common/          # 共享组件 ✅
-│   │   ├── SideDrawer.tsx        # 侧边抽屉
-│   │   ├── Modal.tsx             # 模态框
-│   │   └── Button.tsx            # 按钮
-│   ├── chat/            # 聊天组件 ✅
-│   │   ├── ChatPanel.tsx
-│   │   ├── MessageList.tsx
-│   │   └── MessageInput.tsx
-│   └── ui/              # UI基础组件
-│       ├── button/
-│       ├── input/
-│       └── dialog/
-├── store/               # 状态管理 ✅
-│   ├── spaceStore.ts    # 学习空间状态
-│   └── chatStore.ts     # 聊天状态
-├── types/               # TypeScript类型 ✅
-│   ├── space.ts         # 学习空间类型
-│   ├── chat.ts          # 聊天类型
-│   └── agent.ts         # Agent类型
-├── router/              # 路由配置 ✅
-│   └── index.ts         # 路由定义
-└── utils/               # 工具函数
-    ├── messageFormatter.ts
-    ├── constants.ts
-    └── streamParser.ts
+```mermaid
+flowchart LR
+  U["React 用户界面"] -->|"POST /api/chat"| C["Express / Supervisor"]
+  C --> G["LangGraph 初次规划工作流"]
+  G --> L["DeepSeek 目标分析与任务拆解"]
+  L --> S["确定性调度器"]
+  S --> B["UI Block Builder"]
+  B -->|"SSE events"| D["前端事件解码与 Zod 校验"]
+  D --> Z["Zustand 状态与页面渲染"]
+  G -. "checkpoint / resume" .-> P[("PostgreSQL")]
+  B --> R["业务持久化服务"]
+  R --> P
+  Z -->|"空间、会话、任务、调整确认"| R
 ```
 
-## Getting Started
+## 功能完成矩阵
 
-### Prerequisites
+| 能力 | 状态 | 说明 |
+| --- | --- | --- |
+| 学习空间创建、编辑、暂停/恢复、软删除与恢复 | 已完成 | 单用户开发身份 |
+| SSE 工作流步骤与 Agent 执行过程 | 已完成 | 非法事件诊断后跳过；旧 `field` 字段兼容 |
+| 缺失信息收集与 `resume-stream` | 已完成 | collection-form 可中断并继续工作流 |
+| LLM 任务拆解 + 确定性排程 | 已完成 | 最终日期不直接依赖自由文本输出 |
+| UI Blocks 计划展示 | 已完成 | Block 入库前经 Zod 校验，支持 add/update/remove |
+| PostgreSQL 空间、聊天、计划与任务持久化 | 已完成 | 刷新后从服务端恢复 |
+| 日程查询 | 已完成 | 通过只读 Agent 工具返回 message-scoped Block |
+| 调整预览、拒绝、确认应用 | 已完成 | 确认后创建新版本并归档旧计划 |
+| 自动化质量门禁 | 已完成 | ESLint、Vitest、构建、Playwright、后端 Node Test |
+| 登录认证、公开部署、完整复盘、分享导出、全量重规划 | 非目标 | 不在 v1.0 作品范围内 |
 
-- Node.js 18+ 
-- An Anthropic API key ([Get one here](https://console.anthropic.com/))
+## 技术栈
 
-### Installation
+- 前端：React 19、TypeScript、Vite 8、Zustand、Zod、React Router、SSE、UI Blocks
+- 后端：Node.js、Express、LangGraph、DeepSeek、Zod
+- 数据：PostgreSQL、LangGraph Postgres checkpointer、业务表持久化
+- 测试：Vitest、Playwright、Node.js Test Runner、GitHub Actions
 
-1. Clone the repository:
+## 本地启动
+
+### 前置条件
+
+- Node.js `>=20.19`
+- pnpm `10.33.x`
+- PostgreSQL 14+
+- DeepSeek API Key
+
+建议将两个仓库放在同一父目录：
+
 ```bash
-git clone <repository-url>
-cd react-project
+git clone https://github.com/wukaizzz/learning-plan-agent.git react-project
+git clone https://github.com/wukaizzz/learning-plan-agent-backend.git react-project-backend
 ```
 
-2. Install dependencies:
+先启动后端：
+
 ```bash
+cd react-project-backend
 pnpm install
+cp .env.example .env
+# 编辑 .env：至少填写 DATABASE_URL 与 DEEPSEEK_API_KEY
+pnpm db:migrate
+pnpm dev
 ```
 
-3. Start the development server:
-```bash
-pnpm run dev
-```
-
-4. Open your browser to `http://localhost:5173` (or the port shown in terminal)
-
-### Usage
-
-#### 🎯 学习空间管理
-
-1. **创建学习空间**
-   - 点击"创建学习空间"按钮
-   - 按照5步向导填写信息：
-     - 基础信息（名称、描述、颜色）
-     - 学习目标（主要目标、考试日期、目标分数）
-     - 学科设置（添加学科、设置水平）
-     - 时间安排（每日学习时间、可用日期）
-     - 确认创建
-
-2. **管理学习空间**
-   - 点击卡片进入学习空间
-   - 使用右上角菜单进行操作：
-     - ✏️ 编辑空间信息
-     - ⏸️ 暂停/恢复学习
-     - 📊 查看学习统计
-     - 🔗 分享学习空间
-     - 📥 导出学习报告
-     - 🗑️ 删除空间（30天可恢复）
-
-3. **恢复误删空间**
-   - 点击顶部的"已删除空间"按钮
-   - 选择要恢复的空间
-   - 点击"恢复"按钮
-
-#### 🤖 AI对话功能
-
-1. **输入API密钥**: 首次启动时输入Anthropic API密钥
-2. **开始对话**: 输入消息并按Enter发送
-3. **观看流式响应**: 实时查看AI回复过程
-4. **工具调用**: 询问天气、计算、搜索等问题
-
-#### 🎨 界面操作
-
-- **点击空间卡片**: 跳转到对应的学习空间聊天界面
-- **侧边抽屉**: 所有表单使用侧边抽屉，保持上下文
-- **视图切换**: 支持网格视图和列表视图
-- **筛选搜索**: 按状态筛选，搜索学习空间
-
-## Available Tools
-
-### Weather Tool
-Get current weather information for any location.
-```
-User: "What's the weather in Tokyo?"
-Agent: [Uses weather tool to fetch Tokyo's weather]
-```
-
-### Calculator Tool
-Perform mathematical calculations.
-```
-User: "What's 25 * 37?"
-Agent: [Uses calculator tool]
-```
-
-### Web Search Tool
-Search the web for information (simulated).
-```
-User: "Search for the latest React updates"
-Agent: [Uses web search tool]
-```
-
-## Configuration
-
-### 学习空间配置
-
-学习空间在 `src/store/spaceStore.ts` 中配置：
-
-```typescript
-// 创建学习空间
-createSpace: {
-  name: "高等数学期末冲刺",
-  description: "为期末考试做好准备",
-  goal: {
-    primaryGoal: "期末考试获得85分以上",
-    examDate: new Date("2024-06-15"),
-    targetScore: 85
-  },
-  subjects: [
-    {
-      name: "高等数学",
-      currentLevel: 60,
-      targetLevel: 85,
-      weight: 0.8
-    }
-  ],
-  schedule: {
-    availableHoursPerDay: 4,
-    availableDays: ["周一", "周二", "周三", "周四", "周五"],
-    preferredTimeSlots: ["晚上"],
-    startDate: new Date()
-  }
-}
-```
-
-### 状态管理配置
-
-项目使用Zustand进行状态管理，主要Store包括：
-
-- **spaceStore**: 学习空间管理 (创建、编辑、删除、恢复)
-- **chatStore**: 聊天会话管理 (消息历史、当前会话)
-
-### 添加新的操作菜单
-
-在 `src/components/workspace/SpaceActionsMenu.tsx` 中扩展：
-
-```typescript
-// 添加新的操作类型
-interface SpaceActionsMenuProps {
-  // ... 现有操作
-  onNewAction?: () => void;  // 新操作
-}
-
-// 在菜单中添加按钮
-<button onClick={() => handleAction(onNewAction)}>
-  新操作
-</button>
-```
-
-## Development
-
-### Available Scripts
-
-- `pnpm run dev` - Start development server
-- `pnpm run build` - Build for production
-- `pnpm run preview` - Preview production build
-- `pnpm run lint` - Run ESLint
-
-### Building for Production
+再启动前端：
 
 ```bash
-pnpm run build
-```
-
-The built files will be in the `dist/` directory.
-
-## Key Features
-
-### 🎯 学习空间管理系统
-- **分步创建向导**: 5步骤智能引导，复杂信息轻松录入
-- **完整CRUD操作**: 创建、读取、更新、删除学习空间
-- **软删除保护**: 30天恢复期，避免误操作导致数据丢失
-- **丰富操作菜单**: 编辑、暂停、统计、分享、导出等6种操作
-- **状态管理**: 支持规划中、进行中、已暂停、已完成等状态
-
-### 🎨 现代化UI交互
-- **侧边抽屉设计**: 保持上下文的同时提供足够的表单空间
-- **响应式布局**: 完美适配桌面和移动设备
-- **流畅动画**: 优雅的过渡效果和加载状态
-- **直观操作**: 点击卡片跳转、右键菜单、快捷键支持
-
-### 💾 智能数据管理
-- **本地持久化**: 使用LocalStorage保存学习空间和聊天记录
-- **状态同步**: Zustand + Immer确保状态一致性
-- **数据验证**: TypeScript类型系统确保数据安全
-- **错误恢复**: 软删除机制支持数据恢复
-
-### 🤖 AI对话能力
-- **实时流式响应**: 观看AI回复的生成过程
-- **工具调用**: 支持计算器、天气查询、网页搜索等工具
-- **上下文管理**: 每个学习空间维护独立的对话上下文
-- **多轮对话**: 支持连续对话和上下文理解
-
-## Troubleshooting
-
-### API Key Issues
-Make sure your Anthropic API key is valid and has sufficient credits.
-
-### Build Issues
-Try clearing the node_modules and reinstalling:
-```bash
-rm -rf node_modules
+cd ../react-project
 pnpm install
+cp .env.example .env
+pnpm dev
 ```
 
-### 学习空间数据丢失
-学习空间数据保存在浏览器的LocalStorage中：
-- 检查浏览器是否清除了LocalStorage
-- 查看浏览器控制台是否有错误信息
-- 尝试在隐身模式下测试（功能正常则为数据问题）
+打开 <http://localhost:5173>，点击“加载示例空间”即可开始演示。后端健康检查地址为 <http://localhost:3001/health>。
 
-### UI组件显示异常
-1. 清除浏览器缓存
-2. 检查是否有JavaScript错误
-3. 确认所有依赖已正确安装：`pnpm install`
-4. 尝试重启开发服务器
+Windows PowerShell 可用 `Copy-Item .env.example .env` 替代 `cp`。
 
-## Future Enhancements
+## 测试与构建
 
-### 🎯 即将推出的功能
+前端：
 
-- [ ] **Schema-Driven Generative UI** - AI输出结构化UI组件
-- [ ] **智能学习计划生成** - 基于目标的自动规划算法
-- [ ] **任务管理系统** - 学习任务拆解和追踪
-- [ ] **学习Dashboard** - 进度分析、风险预警、学习统计
-- [ ] **多AI Agent协作** - 不同专长的Agent协同工作
+```bash
+pnpm lint
+pnpm test:run
+pnpm build
+pnpm test:e2e
+```
 
-### 🚀 长期规划
+后端：
 
-- [ ] 移动端优化和原生应用
-- [ ] 数据云同步和备份
-- [ ] 学习社区和模板分享
-- [ ] 个性化学习算法优化
-- [ ] 开放API和插件生态
+```bash
+pnpm test
+pnpm db:health
+```
+
+无 `DATABASE_URL` 时，PostgreSQL 集成测试会明确显示为 skipped；配置测试数据库后会自动纳入 `pnpm test`。
+
+## 仓库结构
+
+```text
+react-project/
+├─ src/core/stream/          # SSE 事件解码与契约归一化
+├─ src/hooks/useStream.ts    # SSE 消费与工作流事件归约
+├─ src/store/                # 空间、聊天和计划状态
+├─ src/core/schema/          # UI Block 组件注册表
+├─ e2e/                     # 固定 HTTP/SSE fixture 的作品集 Smoke Test
+├─ docs/                    # 截图与演示脚本
+└─ .github/workflows/       # 前端质量门禁
+```
+
+后端工作流与持久化实现见[后端 README](https://github.com/wukaizzz/learning-plan-agent-backend#readme)。
+
+## 演示与发布
+
+150–180 秒录制脚本、镜头时间轴、截图重现命令和 Release 检查表见 [docs/DEMO.md](docs/DEMO.md)。代码不会自动提交、推送或发布，确认完整演练后再由仓库所有者创建 `v1.0.0-portfolio` Release。
+
+## 当前限制
+
+- 仅提供 `default-user` 单用户开发身份，没有认证和权限模型。
+- 作品以本地运行和录屏演示为目标，没有公开部署配置。
+- DeepSeek 是主模型；其他供应商入口不作为本版本能力承诺。
+- 完整学习复盘、空间分享/导出和全量重规划不属于 v1.0 范围。
+- PostgreSQL 是可信持久化来源；浏览器缓存仅用于离线容错与待同步队列。
 
 ## License
 
-MIT License - feel free to use this project for learning and development.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
----
-
-## 📊 项目完成度
-
-**当前版本**: v0.3.0-beta
-**发布日期**: 2026-04-27
-**总体完成度**: 50%
-
-### ✅ 已完成功能
-- ✅ 学习空间完整CRUD系统
-- ✅ 分步创建向导 (5步骤)
-- ✅ 软删除机制 (30天恢复)
-- ✅ 侧边抽屉UI组件
-- ✅ 操作菜单系统
-- ✅ 基础聊天界面
-- ✅ 状态管理系统
-- ✅ 响应式设计
-- ✅ **空间聊天隔离** - 每个学习空间独立的聊天记录
-
-### 🔥 开发中功能
-- 🔥 AI学习规划算法
-- 🔥 任务管理系统
-- 🔥 学习Dashboard
-- 🔥 Schema-Driven UI
-- 🔥 智能计划生成
-
-**项目状态**: 🟢 学习空间与聊天系统集成完成，AI功能开发准备就绪
-**下一步**: 实现Schema系统，开始AI学习规划核心功能开发
+MIT
